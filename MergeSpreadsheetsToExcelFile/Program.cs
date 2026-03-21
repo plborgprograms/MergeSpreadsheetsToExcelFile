@@ -81,6 +81,90 @@ class Program
                     firstFile = false;
                 }
 
+                /*
+                // ---------------------------------------------
+                // ADD SUMMARY ROWS (Avg Sell > Buy, Avg Buy > Sell)
+                // ---------------------------------------------
+
+                // Data ends at row-1
+                int dataStartRow = 1;   // or 2 if you have a header row in Excel
+                int dataEndRow = row - 1;
+
+                // Determine last two columns dynamically
+                int lastColumn = ws.Dimension.End.Column;
+                int colBuy = lastColumn - 1;
+                int colSell = lastColumn;
+
+                // Convert column numbers to Excel letters
+                string ColLetter(int col) =>
+                    OfficeOpenXml.ExcelCellAddress.GetColumnLetter(col);
+
+                string buyColLetter = ColLetter(colBuy);
+                string sellColLetter = ColLetter(colSell);
+
+                // Build ranges like F1:F5000
+                string buyRange = $"{buyColLetter}{dataStartRow}:{buyColLetter}{dataEndRow}";
+                string sellRange = $"{sellColLetter}{dataStartRow}:{sellColLetter}{dataEndRow}";
+
+                // Summary rows
+                int summaryRow1 = row + 1;
+                int summaryRow2 = row + 2;
+
+                // Labels
+                ws.Cells[summaryRow1, 1].Value = "Avg Sell > Buy:";
+                ws.Cells[summaryRow2, 1].Value = "Avg Buy > Sell:";
+
+                // Formulas
+                ws.Cells[summaryRow1, 2].Formula = $"=AVERAGE(FILTER({sellRange}, {sellRange} > {buyRange}))";
+
+                ws.Cells[summaryRow2, 2].Formula = $"=AVERAGE(FILTER({buyRange}, {buyRange} > {sellRange}))";
+                */
+
+                // ---------------------------------------------
+                // ADD SUMMARY ROWS FOR ALL COLUMNS EXCEPT FIRST 3
+                // ---------------------------------------------
+
+                int dataStartRow = 2;          // or 2 if you have headers in Excel
+                int dataEndRow = row - 1;
+
+                int lastColumn = ws.Dimension.End.Column;
+
+                // Summary rows
+                int summaryRow1 = row + 1;
+                int summaryRow2 = row + 2;
+
+                // Labels in column 1
+                ws.Cells[summaryRow1, 1].Value = "Avg Sell > Buy:";
+                ws.Cells[summaryRow2, 1].Value = "Avg Buy > Sell:";
+
+                // Helper to convert column number → Excel letter
+                string ColLetter(int col) =>
+                    OfficeOpenXml.ExcelCellAddress.GetColumnLetter(col);
+
+                // Identify buy/sell columns
+                int colBuy = lastColumn - 1;
+                int colSell = lastColumn;
+
+                string buyColLetter = ColLetter(colBuy);
+                string sellColLetter = ColLetter(colSell);
+
+                string buyRange = $"{buyColLetter}{dataStartRow}:{buyColLetter}{dataEndRow}";
+                string sellRange = $"{sellColLetter}{dataStartRow}:{sellColLetter}{dataEndRow}";
+
+                // Loop through all columns except the first 3
+                for (int col = 4; col <= lastColumn; col++)
+                {
+                    string colLetter = ColLetter(col);
+                    string colRange = $"{colLetter}{dataStartRow}:{colLetter}{dataEndRow}";
+
+                    // Avg Sell > Buy (use SELL column as filter condition)
+                    ws.Cells[summaryRow1, col].Formula =
+                        $"=AVERAGE(FILTER({colRange}-0, {sellRange} > {buyRange}))";
+
+                    // Avg Buy > Sell (use BUY column as filter condition)
+                    ws.Cells[summaryRow2, col].Formula =
+                        $"=AVERAGE(FILTER({colRange}-0, {buyRange} > {sellRange}))";
+                }
             }
 
             package.SaveAs(new FileInfo(outputFile));
