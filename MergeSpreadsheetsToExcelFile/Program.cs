@@ -159,11 +159,11 @@ class Program
 
                     // Avg Sell > Buy (use SELL column as filter condition)
                     ws.Cells[summaryRow1, col].Formula =
-                        $"=AVERAGE(FILTER({colRange}-0, {sellRange} > {buyRange}))";
+                        $"=IFERROR(AVERAGE(FILTER({colRange}-0, {sellRange}-0 > {buyRange}-0)), \"Undefined\")";
 
                     // Avg Buy > Sell (use BUY column as filter condition)
                     ws.Cells[summaryRow2, col].Formula =
-                        $"=AVERAGE(FILTER({colRange}-0, {buyRange} > {sellRange}))";
+                        $"=IFERROR(AVERAGE(FILTER({colRange}-0, {buyRange}-0 > {sellRange}-0)), \"Undefined\")";
                 }
             }
 
