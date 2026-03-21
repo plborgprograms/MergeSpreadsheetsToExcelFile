@@ -83,34 +83,6 @@ class Program
 
             }
 
-            /*foreach (var csvPath in csvFiles)
-            {
-                Console.WriteLine("Importing csvPath: " + csvPath);
-                string sheetName = Path.GetFileNameWithoutExtension(csvPath);
-
-                // Excel sheet names cannot exceed 31 chars
-                if (sheetName.Length > 31)
-                    sheetName = sheetName.Substring(sheetName.Length - 31);
-
-                var ws = package.Workbook.Worksheets.Add(sheetName);
-
-                int row = 1;
-
-                foreach (var line in File.ReadLines(csvPath))
-                {
-
-                    //add row
-                    var cells = line.Split(',');
-
-                    for (int col = 1; col <= cells.Length; col++)
-                    {
-                        ws.Cells[row, col].Value = cells[col - 1];
-                    }
-
-                    row++;
-                }
-            }*/
-
             package.SaveAs(new FileInfo(outputFile));
         }
 
