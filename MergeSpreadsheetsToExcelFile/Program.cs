@@ -145,11 +145,64 @@ class Program
                 int colBuy = lastColumn - 1;
                 int colSell = lastColumn;
 
+                string col9L = ColLetter(8); //optimistic1mRisk column
+                string col10L = ColLetter(10); //totalOptimistic1mRisk column
+
+                // Summary rows
+                int avgProfitRow = row + 1;
+                int avgLossRow = row + 2;
+                int oddsProfitRow = row + 3;
+                int oddsLossRow = row + 4;
+                int reqProfitRow = row + 5;
+
                 string buyColLetter = ColLetter(colBuy);
                 string sellColLetter = ColLetter(colSell);
 
                 string buyRange = $"{buyColLetter}{dataStartRow}:{buyColLetter}{dataEndRow}";
                 string sellRange = $"{sellColLetter}{dataStartRow}:{sellColLetter}{dataEndRow}";
+
+                string col9Range = $"{col9L}{dataStartRow}:{col9L}{dataEndRow}";
+                string col10Range = $"{col10L}{dataStartRow}:{col10L}{dataEndRow}";
+
+
+                // Labels
+                ws.Cells[avgProfitRow, 1].Value = "Avg Profit (weighted):";
+                ws.Cells[avgLossRow, 1].Value = "Avg Loss (weighted):";
+                ws.Cells[oddsProfitRow, 1].Value = "Odds of Profit:";
+                ws.Cells[oddsLossRow, 1].Value = "Odds of Loss:";
+                ws.Cells[reqProfitRow, 1].Value = "Required Profit to Break Even:";
+
+                // Weighted Avg Profit
+                ws.Cells[avgProfitRow, 2].Formula =
+                    $"=IFERROR(AVERAGE(FILTER(({sellRange}-0-{buyRange}-0)*(({col10Range}-0)/({col9Range}-0)), {sellRange}-0 >{buyRange}-0)), \"Undefined\")";
+
+                // Weighted Avg Loss
+                ws.Cells[avgLossRow, 2].Formula =
+                    $"=IFERROR(AVERAGE(FILTER(({buyRange}-0-{sellRange}-0)*(({col10Range}-0)/({col9Range}-0)), {buyRange}-0 >{sellRange}-0)), \"Undefined\")";
+
+                /*
+                // Odds of Profit
+                ws.Cells[oddsProfitRow, 2].Formula =
+                    $"=IFERROR(COUNTIF({sellRange}, \">\" & {buyRange}) / ROWS(({sellRange}-0)), 0)";
+
+                // Odds of Loss
+                ws.Cells[oddsLossRow, 2].Formula =
+                    $"=IFERROR(COUNTIF({buyRange}, \">\" & {sellRange}) / ROWS({buyRange}-0), 0)";
+                */
+                // Odds of Profit
+                ws.Cells[oddsProfitRow, 2].Formula =
+                    $"=IFERROR(ROWS(FILTER({sellRange}-0, {sellRange}-0 > {buyRange}-0)) / ROWS({sellRange}-0), 0)";
+
+                // Odds of Loss
+                ws.Cells[oddsLossRow, 2].Formula =
+                    $"=IFERROR(ROWS(FILTER({buyRange}-0, {buyRange}-0 > {sellRange}-0)) / ROWS({buyRange}-0), 0)";
+                // Required Profit to Break Even (based on dollars risked)
+                // Formula: RequiredProfit = Risk * (1 - WinRate) / WinRate
+                // Here "Risk" = average weighted loss
+                ws.Cells[reqProfitRow, 2].Formula =
+                    $"=IFERROR(({ws.Cells[avgLossRow, 2].Address} * (1 - {ws.Cells[oddsProfitRow, 2].Address})) / {ws.Cells[oddsProfitRow, 2].Address}, \"Undefined\")";
+
+
 
                 // Loop through all columns except the first 3
                 for (int col = 4; col <= lastColumn; col++)
