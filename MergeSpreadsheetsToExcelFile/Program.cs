@@ -218,6 +218,70 @@ class Program
                     ws.Cells[summaryRow2, col].Formula =
                         $"=IFERROR(AVERAGE(FILTER({colRange}-0, {buyRange}-0 > {sellRange}-0)), \"Undefined\")";
                 }
+
+
+                // ---------------------------------------------
+                // SUMMARY ROWS: Risk-Based Profitability Analytics
+                // ---------------------------------------------
+
+                int riskBasedSpacer = 6; //extra space before starting the risk weighted section
+                // ---------------------------------------------
+                // Summary row positions
+                // ---------------------------------------------
+                int riskBasedavgProfitRow = riskBasedSpacer + row + 1;
+                int riskBasedavgLossRow = riskBasedSpacer + row + 2;
+                int riskBasedoddsProfitRow = riskBasedSpacer + row + 3;
+                int riskBasedoddsLossRow = riskBasedSpacer + row + 4;
+                int riskBasedreqProfitRow = riskBasedSpacer + row + 5;
+
+                // ---------------------------------------------
+                // Labels
+                // ---------------------------------------------
+                ws.Cells[riskBasedavgProfitRow, 1].Value = "Avg Profit (risk-weighted):";
+                ws.Cells[riskBasedavgLossRow, 1].Value = "Avg Loss (risk-weighted):";
+                ws.Cells[riskBasedoddsProfitRow, 1].Value = "Odds of Profit:";
+                ws.Cells[riskBasedoddsLossRow, 1].Value = "Odds of Loss:";
+                ws.Cells[riskBasedreqProfitRow, 1].Value = "Required Profit to Break Even:";
+
+                // ---------------------------------------------
+                // RISK PER TRADE (SET THIS VALUE)
+                // ---------------------------------------------
+                double riskPerTrade = 40;   // <<< YOU SET THIS (example: $40 risk per trade)
+
+                // ---------------------------------------------
+                // Risk-Based Weighted Avg Profit
+                // (Sell - Buy) * (Col10 / Col9) / Risk
+                // ---------------------------------------------
+                ws.Cells[riskBasedavgProfitRow, 2].Formula =
+                    $"=IFERROR(AVERAGE(FILTER((({sellRange}-{buyRange})*({col10Range}/{col9Range}))/{riskPerTrade}, {sellRange}>{buyRange})), 0)";
+
+                // ---------------------------------------------
+                // Risk-Based Weighted Avg Loss
+                // (Buy - Sell) * (Col10 / Col9) / Risk
+                // ---------------------------------------------
+                ws.Cells[riskBasedavgLossRow, 2].Formula =
+                    $"=IFERROR(AVERAGE(FILTER((({buyRange}-{sellRange})*({col10Range}/{col9Range}))/{riskPerTrade}, {buyRange}>{sellRange})), 0)";
+
+                // ---------------------------------------------
+                // Odds of Profit
+                // (# rows where Sell > Buy) / total rows
+                // ---------------------------------------------
+                ws.Cells[riskBasedoddsProfitRow, 2].Formula =
+                    $"=IFERROR(ROWS(FILTER({sellRange}-0, {sellRange}-0 > {buyRange}-0)) / ROWS({sellRange}-0), 0)";
+
+                // ---------------------------------------------
+                // Odds of Loss
+                // (# rows where Buy > Sell) / total rows
+                // ---------------------------------------------
+                ws.Cells[riskBasedoddsLossRow, 2].Formula =
+                    $"=IFERROR(ROWS(FILTER({buyRange}-0, {buyRange}-0 > {sellRange}-0)) / ROWS({buyRange}-0), 0)";
+
+                // ---------------------------------------------
+                // Required Profit to Break Even (Risk-Based)
+                // RequiredProfit = Risk * (1 - WinRate) / WinRate
+                // ---------------------------------------------
+                ws.Cells[riskBasedreqProfitRow, 2].Formula =
+                    $"=IFERROR(({riskPerTrade} * (1 - {ws.Cells[oddsProfitRow, 2].Address})) / {ws.Cells[oddsProfitRow, 2].Address}, \"Undefined\")";
             }
 
             package.SaveAs(new FileInfo(outputFile));
