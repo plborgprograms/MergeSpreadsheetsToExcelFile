@@ -287,7 +287,7 @@ class Program
                 // RequiredProfit = Risk * (1 - WinRate) / WinRate
                 // ---------------------------------------------
                 ws.Cells[riskBasedreqProfitRow, 2].Formula =
-                    $"=IFERROR(({riskPerTrade} * (1 - {ws.Cells[oddsProfitRow, 2].Address})) / {ws.Cells[oddsProfitRow, 2].Address}, \"Undefined\")";
+                    $"=IFERROR(({ws.Cells[riskBasedavgLossRow, 2].Address} * (1 - {ws.Cells[oddsProfitRow, 2].Address})) / {ws.Cells[oddsProfitRow, 2].Address}, \"Undefined\")";
 
 
                 // ---------------------------------------------
@@ -351,7 +351,9 @@ class Program
                 // RequiredProfit = Risk * (1 - WinRate) / WinRate
                 // ---------------------------------------------
                 ws.Cells[_5mriskBasedreqProfitRow, 2].Formula =
-                    $"=IFERROR(({riskPerTrade} * (1 - {ws.Cells[oddsProfitRow, 2].Address})) / {ws.Cells[oddsProfitRow, 2].Address}, \"Undefined\")";
+                    $"=IFERROR(({ws.Cells[_5mriskBasedavgLossRow, 2].Address} * (1 - {ws.Cells[oddsProfitRow, 2].Address})) / {ws.Cells[oddsProfitRow, 2].Address}, \"Undefined\")";
+
+
             }
 
             package.SaveAs(new FileInfo(outputFile));
