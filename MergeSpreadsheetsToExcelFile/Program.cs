@@ -211,13 +211,19 @@ class Program
                     string colLetter = ColLetter(col);
                     string colRange = $"{colLetter}{dataStartRow}:{colLetter}{dataEndRow}";
 
-                    // Avg Sell > Buy (use SELL column as filter condition)
-                    ws.Cells[summaryRow1, col].Formula =
-                        $"=IFERROR(AVERAGE(FILTER({colRange}-0, {sellRange}-0 > {buyRange}-0)), \"Undefined\")";
+                    // Avg Sell > Buy
+                    ws.Cells[summaryRow1, col].Formula = $"=IFERROR(AVERAGE(FILTER({colRange}-0, {sellRange}-0 > {buyRange}-0)), \"Undefined\")";
 
-                    // Avg Buy > Sell (use BUY column as filter condition)
-                    ws.Cells[summaryRow2, col].Formula =
-                        $"=IFERROR(AVERAGE(FILTER({colRange}-0, {buyRange}-0 > {sellRange}-0)), \"Undefined\")";
+                    // Avg Buy > Sell
+                    ws.Cells[summaryRow2, col].Formula = $"=IFERROR(AVERAGE(FILTER({colRange}-0, {buyRange}-0 > {sellRange}-0)), \"Undefined\")";
+
+
+                    // Conditional formatting for summaryRow1
+                    var rule = ws.ConditionalFormatting.AddExpression(ws.Cells[summaryRow2, col]);
+
+                    rule.Formula = $"AND(MIN({colRange}-0)>=0, MAX({colRange}-0)<=1, ABS({colLetter}{summaryRow2}-0 - {colLetter}{summaryRow1}-0) >= 0.4)";
+
+                    rule.Style.Font.Bold = true;
                 }
 
 
@@ -298,6 +304,7 @@ class Program
                 int _5mriskBasedoddsProfitRow = riskBasedSpacer + riskBasedSpacer + row + 3;
                 int _5mriskBasedoddsLossRow = riskBasedSpacer + riskBasedSpacer + row + 4;
                 int _5mriskBasedreqProfitRow = riskBasedSpacer + riskBasedSpacer + row + 5;
+                int _5mriskBasedreqNotetRow = riskBasedSpacer + riskBasedSpacer + row + 6;
 
                 // ---------------------------------------------
                 // Labels
@@ -306,10 +313,11 @@ class Program
                 ws.Cells[_5mriskBasedavgLossRow, 1].Value = "Avg Loss (5m risk-weighted):";
                 ws.Cells[_5mriskBasedoddsProfitRow, 1].Value = "Odds of Profit:";
                 ws.Cells[_5mriskBasedoddsLossRow, 1].Value = "Odds of Loss:";
-                ws.Cells[_5mriskBasedreqProfitRow, 1].Value = "Required Profit to Break Even:";
+                ws.Cells[_5mriskBasedreqProfitRow, 1].Value = "Required Multiple Of 5m risk to break even:";
+                ws.Cells[_5mriskBasedreqNotetRow, 1].Value = "Note: these are the multiples of the 5m risk for each of these answers";
 
 
-                string _5mRiskcol= ColLetter(9); //optimistic1mRisk column
+                string _5mRiskcol = ColLetter(9); //optimistic1mRisk column
                 string _5mTotalRiskmcol = ColLetter(11); //totalOptimistic1mRisk column
                 string _5mRiskcolRange = $"{_5mRiskcol}{dataStartRow}:{_5mRiskcol}{dataEndRow}";
                 string _5mTotalRiskcolRange = $"{_5mTotalRiskmcol}{dataStartRow}:{_5mTotalRiskmcol}{dataEndRow}";
