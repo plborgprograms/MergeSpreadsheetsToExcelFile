@@ -1,4 +1,5 @@
 ﻿using OfficeOpenXml;
+using OfficeOpenXml.Drawing.Chart;
 using System;
 using System.ComponentModel;
 using System.IO;
@@ -361,6 +362,56 @@ class Program
                 ws.Cells[_5mriskBasedreqProfitRow, 2].Formula =
                     $"=IFERROR(({ws.Cells[_5mriskBasedavgLossRow, 2].Address} * (1 - {ws.Cells[oddsProfitRow, 2].Address})) / {ws.Cells[oddsProfitRow, 2].Address}, \"Undefined\")";
 
+                //Scatterplot:
+                int riskWeightedProfitCol = lastColumn + 1;
+
+                string profitColLetter = ColLetter(riskWeightedProfitCol);
+
+                // Build helper column
+                for (int r = dataStartRow; r <= dataEndRow; r++)
+                {
+                    ws.Cells[r, riskWeightedProfitCol].Formula =
+                        $"=IFERROR((({sellColLetter}{r}-0)-({buyColLetter}{r}-0)) * (({col10L}{r}-0)/({col9L}{r}-0)), 0)";
+                }
+
+                // Build chart
+                string xRange = _5mTotalRiskcolRange;
+                string yRange = $"{profitColLetter}{dataStartRow}:{profitColLetter}{dataEndRow}";
+
+                var chart = ws.Drawings.AddChart("ProfitVsK", eChartType.XYScatter);
+                chart.Title.Text = "Profit vs Total 5m Risk";
+
+                chart.Series.Add(yRange, xRange);
+
+                /*
+                for (int r = dataStartRow; r <= dataEndRow; r++)
+                {
+                    ws.Cells[r, riskWeightedProfitCol].Formula =
+                    $"=(({sellColLetter}{r}-0)-({buyColLetter}{r}-0)) * (({col10L}{r}-0)/({col9L}{r}-0))";
+                }
+                
+
+                string xRange = $"{_5mTotalRiskcolRange}";
+                string yRange = $"({riskWeightedProfitCol}{dataStartRow}:{riskWeightedProfitCol}{dataEndRow})-0";
+
+                var chart = ws.Drawings.AddChart("ProfitVsK", eChartType.XYScatter);
+                chart.Title.Text = "Profit vs Total 5m Risk";
+
+                chart.Series.Add(yRange, xRange);
+                */
+
+                /*
+                var chart = ws.Drawings.AddChart("ProfitVsK", eChartType.XYScatter);
+                chart.Title.Text = "Profit vs Total 5m Risk";
+
+                var series = chart.Series.Add(
+                    $"(({sellRange}-0)-({buyRange}-0)) * (({col10Range}-0)/({col9Range}-0))",
+                    $"{_5mTotalRiskcolRange}"
+                );
+                */
+
+                chart.SetPosition( (_5mriskBasedreqProfitRow + 3) , 0, 2, 0);
+                chart.SetSize(800, 500);
 
             }
 
