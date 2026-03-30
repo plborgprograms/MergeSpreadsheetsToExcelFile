@@ -318,8 +318,8 @@ class Program
                 ws.Cells[_5mriskBasedreqNotetRow, 1].Value = "Note: these are the multiples of the 5m risk for each of these answers";
 
 
-                string _5mRiskcol = ColLetter(9); //optimistic1mRisk column
-                string _5mTotalRiskmcol = ColLetter(11); //totalOptimistic1mRisk column
+                string _5mRiskcol = ColLetter(9); //optimistic5mRisk column
+                string _5mTotalRiskmcol = ColLetter(11); //totalOptimistic5mRisk column
                 string _5mRiskcolRange = $"{_5mRiskcol}{dataStartRow}:{_5mRiskcol}{dataEndRow}";
                 string _5mTotalRiskcolRange = $"{_5mTotalRiskmcol}{dataStartRow}:{_5mTotalRiskmcol}{dataEndRow}";
 
