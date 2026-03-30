@@ -362,9 +362,16 @@ class Program
                 ws.Cells[_5mriskBasedreqProfitRow, 2].Formula =
                     $"=IFERROR(({ws.Cells[_5mriskBasedavgLossRow, 2].Address} * (1 - {ws.Cells[oddsProfitRow, 2].Address})) / {ws.Cells[oddsProfitRow, 2].Address}, \"Undefined\")";
 
-                //Scatterplot:
-                int riskWeightedProfitCol = lastColumn + 1;
+                // Force numeric formatting
+                ws.Cells[dataStartRow, 4, dataEndRow, lastColumn + 1]
+                    .Style.Numberformat.Format = "0.00";
 
+                //Scatterplot:
+                // Build fully qualified ranges for chart (include sheet name and wrap in single quotes
+                // in case the sheet name contains spaces)
+                string xRange = $"'{ws.Name}'!{_5mTotalRiskcolRange}";
+
+                int riskWeightedProfitCol = lastColumn + 1;
                 string profitColLetter = ColLetter(riskWeightedProfitCol);
 
                 // Build helper column
@@ -374,43 +381,31 @@ class Program
                         $"=IFERROR((({sellColLetter}{r}-0)-({buyColLetter}{r}-0)) * (({col10L}{r}-0)/({col9L}{r}-0)), 0)";
                 }
 
-                // Build chart
-                string xRange = _5mTotalRiskcolRange;
-                string yRange = $"{profitColLetter}{dataStartRow}:{profitColLetter}{dataEndRow}";
+                // Build chart (fully qualified ranges)
+                string yRange = $"'{ws.Name}'!{profitColLetter}{dataStartRow}:{profitColLetter}{dataEndRow}";
 
-                var chart = ws.Drawings.AddChart("ProfitVsK", eChartType.XYScatter);
-                chart.Title.Text = "Profit vs Total 5m Risk";
+                // Create a helper column to coerce the Total 5m Risk values to numeric (chart X values)
+                int xHelperCol = riskWeightedProfitCol + 1;
+                string xHelperColLetter = ColLetter(xHelperCol);
 
-                chart.Series.Add(yRange, xRange);
-
-                /*
                 for (int r = dataStartRow; r <= dataEndRow; r++)
                 {
-                    ws.Cells[r, riskWeightedProfitCol].Formula =
-                    $"=(({sellColLetter}{r}-0)-({buyColLetter}{r}-0)) * (({col10L}{r}-0)/({col9L}{r}-0))";
+                    // Force numeric conversion of the source Total5mRisk column into the helper column
+                    ws.Cells[r, xHelperCol].Formula = $"=IFERROR(({_5mTotalRiskmcol}{r}-0),0)";
                 }
-                
 
-                string xRange = $"{_5mTotalRiskcolRange}";
-                string yRange = $"({riskWeightedProfitCol}{dataStartRow}:{riskWeightedProfitCol}{dataEndRow})-0";
+                string xHelperRange = $"'{ws.Name}'!{xHelperColLetter}{dataStartRow}:{xHelperColLetter}{dataEndRow}";
 
                 var chart = ws.Drawings.AddChart("ProfitVsK", eChartType.XYScatter);
                 chart.Title.Text = "Profit vs Total 5m Risk";
 
-                chart.Series.Add(yRange, xRange);
-                */
+                // Use ExcelRange objects and their full addresses so EPPlus binds the correct ranges
+                var yCells = ws.Cells[dataStartRow, riskWeightedProfitCol, dataEndRow, riskWeightedProfitCol];
+                var xCells = ws.Cells[dataStartRow, xHelperCol, dataEndRow, xHelperCol];
 
-                /*
-                var chart = ws.Drawings.AddChart("ProfitVsK", eChartType.XYScatter);
-                chart.Title.Text = "Profit vs Total 5m Risk";
+                chart.Series.Add(yCells.FullAddress, xCells.FullAddress);
 
-                var series = chart.Series.Add(
-                    $"(({sellRange}-0)-({buyRange}-0)) * (({col10Range}-0)/({col9Range}-0))",
-                    $"{_5mTotalRiskcolRange}"
-                );
-                */
-
-                chart.SetPosition( (_5mriskBasedreqProfitRow + 3) , 0, 2, 0);
+                chart.SetPosition(_5mriskBasedreqProfitRow + 3, 0, 2, 0);
                 chart.SetSize(800, 500);
 
             }
