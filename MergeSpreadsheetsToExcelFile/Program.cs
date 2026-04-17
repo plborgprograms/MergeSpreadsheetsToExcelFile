@@ -350,7 +350,7 @@ class Program
                 ws.Cells[_5mriskBasedavgProfitRow, 2].Formula =
                        //$"=IFERROR(AVERAGE(FILTER((({sellRange}-{buyRange})*({col10Range}/{col9Range}))/{riskPerTrade}, {sellRange}>{buyRange})), 0)";
                        $"=IFERROR(AVERAGE(FILTER(((({sellRange}-{buyRange})-0)*(({_5mTotalRiskcolRange}/{_5mRiskcolRange})-0))/(({_5mTotalRiskcolRange})-0), {sellRange}>{buyRange})), 0)";
-                //( avg                 profit              ) *      (quantity           )    /     (total risk) ,      where profitable
+                                    //( avg                 profit              ) *      (quantity           )               /     (total risk) ,      where profitable
 
                 // ---------------------------------------------
                 // Risk-Based Weighted Avg Loss
@@ -381,6 +381,84 @@ class Program
                 // ---------------------------------------------
                 ws.Cells[_5mriskBasedreqProfitRow, 2].Formula =
                     $"=IFERROR(({ws.Cells[_5mriskBasedavgLossRow, 2].Address} * (1 - {ws.Cells[oddsProfitRow, 2].Address})) / {ws.Cells[oddsProfitRow, 2].Address}, \"Undefined\")";
+
+
+                //New indicator for ema% risk 
+                int colEmaSpread = 28;
+                string emaSpreadColLetter = ColLetter(colEmaSpread);
+
+                //MovementIn5mEmaSpread
+
+                string emaSpreadRange = $"{emaSpreadColLetter}{dataStartRow}:{emaSpreadColLetter}{dataEndRow}"; //profitTakingPrices column
+
+                // ---------------------------------------------
+                // Summary row positions
+                // ---------------------------------------------
+                int emaPercentBasedavgProfitRow = (riskBasedSpacer*3) + row + 1;
+                int emaPercentBasedavgLossRow = (riskBasedSpacer*3) + row + 2;
+                int emaPercentBasedoddsProfitRow = (riskBasedSpacer*3) + row + 3;
+                int emaPercentBasedoddsLossRow = (riskBasedSpacer*3) + row + 4;
+                int emaPercentBasedreqProfitRow = (riskBasedSpacer*3) + row + 5;
+                // ---------------------------------------------
+                // Labels
+                // ---------------------------------------------
+                ws.Cells[emaPercentBasedavgProfitRow, 1].Value = "Avg Profit (1m risk-weighted):";
+                ws.Cells[emaPercentBasedavgLossRow, 1].Value = "Avg Loss (1m risk-weighted):";
+                ws.Cells[emaPercentBasedoddsProfitRow, 1].Value = "Odds of Profit:";
+                ws.Cells[emaPercentBasedoddsLossRow, 1].Value = "Odds of Loss:";
+                ws.Cells[emaPercentBasedreqProfitRow, 1].Value = "Required Profit to Break Even:";
+
+                // ---------------------------------------------
+                // RISK PER TRADE (SET THIS VALUE)
+                // ---------------------------------------------
+
+
+                // ---------------------------------------------
+                // Risk-Based Weighted Avg Profit
+                // (Sell - Buy) * (Col10 / Col9) / Risk
+                // ---------------------------------------------
+                ws.Cells[emaPercentBasedavgProfitRow, 2].Formula =
+                       //$"=IFERROR(AVERAGE(FILTER((({sellRange}-{buyRange})*({col10Range}/{col9Range}))/{riskPerTrade}, {sellRange}>{buyRange})), 0)";
+                       $"=IFERROR(AVERAGE(FILTER(((({sellRange}-{buyRange})-0)*(({col10Range}/{col9Range})-0))/(({col10Range})-0), {sellRange}>{buyRange})), 0)";
+                                    //( avg                 profit              ) *      (quantity           )    /     (total risk) ,      where profitable
+                                    //avg ema% it climbed on the winners vs the avg ema% it fell on the losers.
+                                    //get the ema% by getting the initial ema spread in cents and use that to divide the amount that it rose or fell.
+                                    //( rise or fall amount in cents) / (initial ema spread in cents)   
+                // ---------------------------------------------
+                // Risk-Based Weighted Avg Loss
+                // (Buy - Sell) * (Col10 / Col9) / Risk
+                // ---------------------------------------------
+                ws.Cells[emaPercentBasedavgLossRow, 2].Formula =
+                    //$"=IFERROR(AVERAGE(FILTER((({buyRange}-{sellRange})*({col10Range}/{col9Range}))/{riskPerTrade}, {buyRange}>{sellRange})), 0)";
+                    $"=IFERROR(AVERAGE(FILTER(((({buyRange}-{sellRange})-0)*(({col10Range}/{col9Range})-0))/(({col10Range})-0), {buyRange}>{sellRange})), 0)";
+
+
+                // ---------------------------------------------
+                // Odds of Profit
+                // (# rows where Sell > Buy) / total rows
+                // ---------------------------------------------
+                ws.Cells[emaPercentBasedoddsProfitRow, 2].Formula =
+                    $"=IFERROR(ROWS(FILTER({sellRange}-0, {sellRange}-0 > {buyRange}-0)) / ROWS({sellRange}-0), 0)";
+
+                // ---------------------------------------------
+                // Odds of Loss
+                // (# rows where Buy > Sell) / total rows
+                // ---------------------------------------------
+                ws.Cells[emaPercentBasedoddsLossRow, 2].Formula =
+                    $"=IFERROR(ROWS(FILTER({buyRange}-0, {buyRange}-0 > {sellRange}-0)) / ROWS({buyRange}-0), 0)";
+
+                // ---------------------------------------------
+                // Required Profit to Break Even (Risk-Based)
+                // RequiredProfit = Risk * (1 - WinRate) / WinRate
+                // ---------------------------------------------
+                ws.Cells[riskBasedreqProfitRow, 2].Formula =
+                    $"=IFERROR(({ws.Cells[emaPercentBasedavgLossRow, 2].Address} * (1 - {ws.Cells[oddsProfitRow, 2].Address})) / {ws.Cells[oddsProfitRow, 2].Address}, \"Undefined\")";
+
+                //end new indicator for ema% risk
+
+
+
+
 
                 // Force numeric formatting
                 ws.Cells[dataStartRow, 4, dataEndRow, lastColumn + 1]
