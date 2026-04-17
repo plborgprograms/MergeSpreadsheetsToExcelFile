@@ -133,6 +133,8 @@ class Program
                 // Summary rows
                 int summaryRow1 = row + 1;
                 int summaryRow2 = row + 2;
+                int summaryRow3 = row + 3; //profit hit profit target
+                int summaryRow4 = row + 4; //profit didn't hit profit target
 
                 // Labels in column 1
                 ws.Cells[summaryRow1, 1].Value = "Avg Sell > Buy:";
@@ -146,6 +148,7 @@ class Program
                 int colBuy = lastColumn - 1;
                 int colSell = lastColumn;
 
+                //grabbing these to infer the quantity 
                 string col9L = ColLetter(8); //optimistic1mRisk column
                 string col10L = ColLetter(10); //totalOptimistic1mRisk column
 
@@ -161,6 +164,8 @@ class Program
 
                 string buyRange = $"{buyColLetter}{dataStartRow}:{buyColLetter}{dataEndRow}";
                 string sellRange = $"{sellColLetter}{dataStartRow}:{sellColLetter}{dataEndRow}";
+
+                string profitTakingPricesRange = $"{ColLetter(17)}{dataStartRow}:{ColLetter(17)}{dataEndRow}"; //profitTakingPrices column
 
                 string col9Range = $"{col9L}{dataStartRow}:{col9L}{dataEndRow}";
                 string col10Range = $"{col10L}{dataStartRow}:{col10L}{dataEndRow}";
@@ -225,6 +230,21 @@ class Program
                     rule.Formula = $"AND(MIN({colRange}-0)>=0, MAX({colRange}-0)<=1, ABS({colLetter}{summaryRow2}-0 - {colLetter}{summaryRow1}-0) >= 0.4)";
 
                     rule.Style.Font.Bold = true;
+
+
+                    //profit hit profit target
+                    ws.Cells[summaryRow3, col].Formula = $"=IFERROR(AVERAGE(FILTER({colRange}-0, {sellRange}-0 >= {profitTakingPricesRange}-0)), \"Undefined\")";
+
+
+                    //profit didn't hit profit target  
+                    ws.Cells[summaryRow4, col].Formula = $"=IFERROR(AVERAGE(FILTER({colRange}-0, {sellRange}-0 < {profitTakingPricesRange}-0)), \"Undefined\")";
+
+                    var ProfitTakingrule = ws.ConditionalFormatting.AddExpression(ws.Cells[summaryRow4, col]);
+
+                    ProfitTakingrule.Formula = $"AND(MIN({colRange}-0)>=0, MAX({colRange}-0)<=1, ABS({colLetter}{summaryRow4}-0 - {colLetter}{summaryRow3}-0) >= 0.4)";
+
+                    ProfitTakingrule.Style.Font.Bold = true;
+
                 }
 
 
