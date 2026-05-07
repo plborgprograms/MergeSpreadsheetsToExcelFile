@@ -162,10 +162,12 @@ class Program
                 string buyColLetter = ColLetter(colBuy);
                 string sellColLetter = ColLetter(colSell);
 
+
                 string buyRange = $"{buyColLetter}{dataStartRow}:{buyColLetter}{dataEndRow}";
                 string sellRange = $"{sellColLetter}{dataStartRow}:{sellColLetter}{dataEndRow}";
 
-                string profitTakingPricesRange = $"{ColLetter(17)}{dataStartRow}:{ColLetter(17)}{dataEndRow}"; //profitTakingPrices column
+
+                //string profitTakingPricesRange = $"{ColLetter(17)}{dataStartRow}:{ColLetter(17)}{dataEndRow}"; //profitTakingPrices column
 
                 string col9Range = $"{col9L}{dataStartRow}:{col9L}{dataEndRow}";
                 string col10Range = $"{col10L}{dataStartRow}:{col10L}{dataEndRow}";
@@ -384,26 +386,26 @@ class Program
 
 
                 //New indicator for ema% risk 
-                int colEmaSpread = 28;
-                string emaSpreadColLetter = ColLetter(colEmaSpread);
+                int colEmaClimb = 29;// 28; shift one for new column
+                string emaClimbColLetter = ColLetter(colEmaClimb);
 
                 //MovementIn5mEmaSpread
 
-                string emaSpreadRange = $"{emaSpreadColLetter}{dataStartRow}:{emaSpreadColLetter}{dataEndRow}"; //profitTakingPrices column
+                string emaClimbRange = $"{emaClimbColLetter}{dataStartRow}:{emaClimbColLetter}{dataEndRow}"; //profitTakingPrices column
 
                 // ---------------------------------------------
                 // Summary row positions
                 // ---------------------------------------------
-                int emaPercentBasedavgProfitRow = (riskBasedSpacer*3) + row + 1;
-                int emaPercentBasedavgLossRow = (riskBasedSpacer*3) + row + 2;
-                int emaPercentBasedoddsProfitRow = (riskBasedSpacer*3) + row + 3;
-                int emaPercentBasedoddsLossRow = (riskBasedSpacer*3) + row + 4;
-                int emaPercentBasedreqProfitRow = (riskBasedSpacer*3) + row + 5;
+                int emaPercentBasedavgProfitRow = (riskBasedSpacer*3) + row + 1 + 1;
+                int emaPercentBasedavgLossRow = (riskBasedSpacer*3) + row + 2 + 1;
+                int emaPercentBasedoddsProfitRow = (riskBasedSpacer*3) + row + 3 + 1;
+                int emaPercentBasedoddsLossRow = (riskBasedSpacer*3) + row + 4 + 1;
+                int emaPercentBasedreqProfitRow = (riskBasedSpacer*3) + row + 5 + 1;
                 // ---------------------------------------------
                 // Labels
                 // ---------------------------------------------
-                ws.Cells[emaPercentBasedavgProfitRow, 1].Value = "Avg Profit (1m risk-weighted):";
-                ws.Cells[emaPercentBasedavgLossRow, 1].Value = "Avg Loss (1m risk-weighted):";
+                ws.Cells[emaPercentBasedavgProfitRow, 1].Value = "Avg Profit (5m ema%):";
+                ws.Cells[emaPercentBasedavgLossRow, 1].Value = "Avg Loss (5m ema%):";
                 ws.Cells[emaPercentBasedoddsProfitRow, 1].Value = "Odds of Profit:";
                 ws.Cells[emaPercentBasedoddsLossRow, 1].Value = "Odds of Loss:";
                 ws.Cells[emaPercentBasedreqProfitRow, 1].Value = "Required Profit to Break Even:";
@@ -414,23 +416,16 @@ class Program
 
 
                 // ---------------------------------------------
-                // Risk-Based Weighted Avg Profit
-                // (Sell - Buy) * (Col10 / Col9) / Risk
+                // EMA%-based Avg Win / Avg Loss
+                // Average of (rise or fall amount) divided by initial EMA spread
+                // Avg Win: average of ((Sell - Buy) / EMAspread) where Sell > Buy
+                // Avg Loss: average of ((Buy - Sell) / EMAspread) where Buy > Sell
                 // ---------------------------------------------
                 ws.Cells[emaPercentBasedavgProfitRow, 2].Formula =
-                       //$"=IFERROR(AVERAGE(FILTER((({sellRange}-{buyRange})*({col10Range}/{col9Range}))/{riskPerTrade}, {sellRange}>{buyRange})), 0)";
-                       $"=IFERROR(AVERAGE(FILTER(((({sellRange}-{buyRange})-0)*(({col10Range}/{col9Range})-0))/(({col10Range})-0), {sellRange}>{buyRange})), 0)";
-                                    //( avg                 profit              ) *      (quantity           )    /     (total risk) ,      where profitable
-                                    //avg ema% it climbed on the winners vs the avg ema% it fell on the losers.
-                                    //get the ema% by getting the initial ema spread in cents and use that to divide the amount that it rose or fell.
-                                    //( rise or fall amount in cents) / (initial ema spread in cents)   
-                // ---------------------------------------------
-                // Risk-Based Weighted Avg Loss
-                // (Buy - Sell) * (Col10 / Col9) / Risk
-                // ---------------------------------------------
+                    $"=IFERROR(AVERAGE(FILTER(({emaClimbRange}-0), {sellRange}-0 > {buyRange}-0)), \"Undefined\")";
+
                 ws.Cells[emaPercentBasedavgLossRow, 2].Formula =
-                    //$"=IFERROR(AVERAGE(FILTER((({buyRange}-{sellRange})*({col10Range}/{col9Range}))/{riskPerTrade}, {buyRange}>{sellRange})), 0)";
-                    $"=IFERROR(AVERAGE(FILTER(((({buyRange}-{sellRange})-0)*(({col10Range}/{col9Range})-0))/(({col10Range})-0), {buyRange}>{sellRange})), 0)";
+                    $"=IFERROR(AVERAGE(FILTER(-1*({emaClimbRange}-0), {buyRange}-0 > {sellRange}-0)), \"Undefined\")";
 
 
                 // ---------------------------------------------
@@ -448,10 +443,10 @@ class Program
                     $"=IFERROR(ROWS(FILTER({buyRange}-0, {buyRange}-0 > {sellRange}-0)) / ROWS({buyRange}-0), 0)";
 
                 // ---------------------------------------------
-                // Required Profit to Break Even (Risk-Based)
+                // Required Profit to Break Even (Ema%-Based)
                 // RequiredProfit = Risk * (1 - WinRate) / WinRate
                 // ---------------------------------------------
-                ws.Cells[riskBasedreqProfitRow, 2].Formula =
+                ws.Cells[emaPercentBasedreqProfitRow, 2].Formula =
                     $"=IFERROR(({ws.Cells[emaPercentBasedavgLossRow, 2].Address} * (1 - {ws.Cells[oddsProfitRow, 2].Address})) / {ws.Cells[oddsProfitRow, 2].Address}, \"Undefined\")";
 
                 //end new indicator for ema% risk
@@ -503,7 +498,7 @@ class Program
 
                 chart.Series.Add(yCells.FullAddress, xCells.FullAddress);
 
-                chart.SetPosition(_5mriskBasedreqProfitRow + 3, 0, 2, 0);
+                chart.SetPosition(emaPercentBasedreqProfitRow + 3, 0, 3, 0);
                 chart.SetSize(800, 500);
 
             }
