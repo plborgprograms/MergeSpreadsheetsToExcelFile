@@ -167,7 +167,7 @@ class Program
                 string sellRange = $"{sellColLetter}{dataStartRow}:{sellColLetter}{dataEndRow}";
 
 
-                //string profitTakingPricesRange = $"{ColLetter(17)}{dataStartRow}:{ColLetter(17)}{dataEndRow}"; //profitTakingPrices column
+                string profitTakingPricesRange = $"{ColLetter(17)}{dataStartRow}:{ColLetter(17)}{dataEndRow}"; //profitTakingPrices column
 
                 string col9Range = $"{col9L}{dataStartRow}:{col9L}{dataEndRow}";
                 string col10Range = $"{col10L}{dataStartRow}:{col10L}{dataEndRow}";
@@ -182,12 +182,12 @@ class Program
 
                 // Weighted Avg Profit
                 ws.Cells[avgProfitRow, 2].Formula =
-                    $"=IFERROR(AVERAGE(FILTER(({sellRange}-0-{buyRange}-0)*(({col10Range}-0)/({col9Range}-0)), {sellRange}-0 >{buyRange}-0)), \"Undefined\")";
+                    $"=IFERROR(AVERAGE(FILTER(({sellRange}-0-{buyRange}-0)*(({col10Range}-0)/({col9Range}-0)), {sellRange}-0 >= {profitTakingPricesRange}-0)), \"Undefined\")";
                                  //( avg                 profit          ) *      (quantity           )    /       where profitable
 
                 // Weighted Avg Loss
                 ws.Cells[avgLossRow, 2].Formula =
-                    $"=IFERROR(AVERAGE(FILTER(({buyRange}-0-{sellRange}-0)*(({col10Range}-0)/({col9Range}-0)), {buyRange}-0 >{sellRange}-0)), \"Undefined\")";
+                    $"=IFERROR(AVERAGE(FILTER(({buyRange}-0-{sellRange}-0)*(({col10Range}-0)/({col9Range}-0)), {profitTakingPricesRange}-0 > {sellRange}-0)), \"Undefined\")";
 
                 /*
                 // Odds of Profit
@@ -200,11 +200,11 @@ class Program
                 */
                 // Odds of Profit
                 ws.Cells[oddsProfitRow, 2].Formula =
-                    $"=IFERROR(ROWS(FILTER({sellRange}-0, {sellRange}-0 > {buyRange}-0)) / ROWS({sellRange}-0), 0)";
+                    $"=IFERROR(ROWS(FILTER({sellRange}-0, {sellRange}-0 >= {profitTakingPricesRange}-0)) / ROWS({sellRange}-0), 0)";
 
                 // Odds of Loss
                 ws.Cells[oddsLossRow, 2].Formula =
-                    $"=IFERROR(ROWS(FILTER({buyRange}-0, {buyRange}-0 > {sellRange}-0)) / ROWS({buyRange}-0), 0)";
+                    $"=IFERROR(ROWS(FILTER({buyRange}-0, {profitTakingPricesRange}-0 > {sellRange}-0)) / ROWS({buyRange}-0), 0)";
                 // Required Profit to Break Even (based on dollars risked)
                 // Formula: RequiredProfit = Risk * (1 - WinRate) / WinRate
                 // Here "Risk" = average weighted loss
@@ -219,11 +219,11 @@ class Program
                     string colLetter = ColLetter(col);
                     string colRange = $"{colLetter}{dataStartRow}:{colLetter}{dataEndRow}";
 
-                    // Avg Sell > Buy
-                    ws.Cells[summaryRow1, col].Formula = $"=IFERROR(AVERAGE(FILTER({colRange}-0, {sellRange}-0 > {buyRange}-0)), \"Undefined\")";
+                    // Avg Sell > Buy (now: sell >= profit taking price for win)
+                    ws.Cells[summaryRow1, col].Formula = $"=IFERROR(AVERAGE(FILTER({colRange}-0, {sellRange}-0 >= {profitTakingPricesRange}-0)), \"Undefined\")";
 
                     // Avg Buy > Sell
-                    ws.Cells[summaryRow2, col].Formula = $"=IFERROR(AVERAGE(FILTER({colRange}-0, {buyRange}-0 > {sellRange}-0)), \"Undefined\")";
+                    ws.Cells[summaryRow2, col].Formula = $"=IFERROR(AVERAGE(FILTER({colRange}-0, {profitTakingPricesRange}-0 > {sellRange}-0)), \"Undefined\")";
 
 
                     // Conditional formatting for summaryRow1
@@ -234,7 +234,7 @@ class Program
                     rule.Style.Font.Bold = true;
 
 
-                    //profit hit profit target
+                    //profit hit profit target (sell >= profit target)
                     ws.Cells[summaryRow3, col].Formula = $"=IFERROR(AVERAGE(FILTER({colRange}-0, {sellRange}-0 >= {profitTakingPricesRange}-0)), \"Undefined\")";
 
 
@@ -285,7 +285,7 @@ class Program
                 // ---------------------------------------------
                 ws.Cells[riskBasedavgProfitRow, 2].Formula =
                        //$"=IFERROR(AVERAGE(FILTER((({sellRange}-{buyRange})*({col10Range}/{col9Range}))/{riskPerTrade}, {sellRange}>{buyRange})), 0)";
-                       $"=IFERROR(AVERAGE(FILTER(((({sellRange}-{buyRange})-0)*(({col10Range}/{col9Range})-0))/(({col10Range})-0), {sellRange}>{buyRange})), 0)";
+                       $"=IFERROR(AVERAGE(FILTER(((({sellRange}-{buyRange})-0)*(({col10Range}/{col9Range})-0))/(({col10Range})-0), {sellRange}>={profitTakingPricesRange})), 0)";
                                 //( avg                 profit              ) *      (quantity           )    /     (total risk) ,      where profitable
 
                 // ---------------------------------------------
@@ -294,7 +294,7 @@ class Program
                 // ---------------------------------------------
                 ws.Cells[riskBasedavgLossRow, 2].Formula =
                     //$"=IFERROR(AVERAGE(FILTER((({buyRange}-{sellRange})*({col10Range}/{col9Range}))/{riskPerTrade}, {buyRange}>{sellRange})), 0)";
-                    $"=IFERROR(AVERAGE(FILTER(((({buyRange}-{sellRange})-0)*(({col10Range}/{col9Range})-0))/(({col10Range})-0), {buyRange}>{sellRange})), 0)";
+                    $"=IFERROR(AVERAGE(FILTER(((({buyRange}-{sellRange})-0)*(({col10Range}/{col9Range})-0))/(({col10Range})-0), {profitTakingPricesRange}-0 > {sellRange}-0)), 0)";
 
 
                 // ---------------------------------------------
@@ -302,14 +302,14 @@ class Program
                 // (# rows where Sell > Buy) / total rows
                 // ---------------------------------------------
                 ws.Cells[riskBasedoddsProfitRow, 2].Formula =
-                    $"=IFERROR(ROWS(FILTER({sellRange}-0, {sellRange}-0 > {buyRange}-0)) / ROWS({sellRange}-0), 0)";
+                    $"=IFERROR(ROWS(FILTER({sellRange}-0, {sellRange}-0 >= {profitTakingPricesRange}-0)) / ROWS({sellRange}-0), 0)";
 
                 // ---------------------------------------------
                 // Odds of Loss
                 // (# rows where Buy > Sell) / total rows
                 // ---------------------------------------------
                 ws.Cells[riskBasedoddsLossRow, 2].Formula =
-                    $"=IFERROR(ROWS(FILTER({buyRange}-0, {buyRange}-0 > {sellRange}-0)) / ROWS({buyRange}-0), 0)";
+                    $"=IFERROR(ROWS(FILTER({buyRange}-0, {profitTakingPricesRange}-0 > {sellRange}-0)) / ROWS({buyRange}-0), 0)";
 
                 // ---------------------------------------------
                 // Required Profit to Break Even (Risk-Based)
@@ -351,7 +351,7 @@ class Program
                 // ---------------------------------------------
                 ws.Cells[_5mriskBasedavgProfitRow, 2].Formula =
                        //$"=IFERROR(AVERAGE(FILTER((({sellRange}-{buyRange})*({col10Range}/{col9Range}))/{riskPerTrade}, {sellRange}>{buyRange})), 0)";
-                       $"=IFERROR(AVERAGE(FILTER(((({sellRange}-{buyRange})-0)*(({_5mTotalRiskcolRange}/{_5mRiskcolRange})-0))/(({_5mTotalRiskcolRange})-0), {sellRange}>{buyRange})), 0)";
+                       $"=IFERROR(AVERAGE(FILTER(((({sellRange}-{buyRange})-0)*(({_5mTotalRiskcolRange}/{_5mRiskcolRange})-0))/(({_5mTotalRiskcolRange})-0), {sellRange}-0 >= {profitTakingPricesRange}-0)), 0)";
                                     //( avg                 profit              ) *      (quantity           )               /     (total risk) ,      where profitable
 
                 // ---------------------------------------------
@@ -360,7 +360,7 @@ class Program
                 // ---------------------------------------------
                 ws.Cells[_5mriskBasedavgLossRow, 2].Formula =
                     //$"=IFERROR(AVERAGE(FILTER((({buyRange}-{sellRange})*({col10Range}/{col9Range}))/{riskPerTrade}, {buyRange}>{sellRange})), 0)";
-                    $"=IFERROR(AVERAGE(FILTER(((({buyRange}-{sellRange})-0)*(({_5mTotalRiskcolRange}/{_5mRiskcolRange})-0))/(({_5mTotalRiskcolRange})-0), {buyRange}>{sellRange})), 0)";
+                    $"=IFERROR(AVERAGE(FILTER(((({buyRange}-{sellRange})-0)*(({_5mTotalRiskcolRange}/{_5mRiskcolRange})-0))/(({_5mTotalRiskcolRange})-0), {profitTakingPricesRange}-0 > {sellRange}-0)), 0)";
 
 
                 // ---------------------------------------------
@@ -368,14 +368,14 @@ class Program
                 // (# rows where Sell > Buy) / total rows
                 // ---------------------------------------------
                 ws.Cells[_5mriskBasedoddsProfitRow, 2].Formula =
-                    $"=IFERROR(ROWS(FILTER({sellRange}-0, {sellRange}-0 > {buyRange}-0)) / ROWS({sellRange}-0), 0)";
+                    $"=IFERROR(ROWS(FILTER({sellRange}-0, {sellRange}-0 >= {profitTakingPricesRange}-0)) / ROWS({sellRange}-0), 0)";
 
                 // ---------------------------------------------
                 // Odds of Loss
                 // (# rows where Buy > Sell) / total rows
                 // ---------------------------------------------
                 ws.Cells[_5mriskBasedoddsLossRow, 2].Formula =
-                    $"=IFERROR(ROWS(FILTER({buyRange}-0, {buyRange}-0 > {sellRange}-0)) / ROWS({buyRange}-0), 0)";
+                    $"=IFERROR(ROWS(FILTER({buyRange}-0, {profitTakingPricesRange}-0 > {sellRange}-0)) / ROWS({buyRange}-0), 0)";
 
                 // ---------------------------------------------
                 // Required Profit to Break Even (Risk-Based)
@@ -422,10 +422,10 @@ class Program
                 // Avg Loss: average of ((Buy - Sell) / EMAspread) where Buy > Sell
                 // ---------------------------------------------
                 ws.Cells[emaPercentBasedavgProfitRow, 2].Formula =
-                    $"=IFERROR(AVERAGE(FILTER(({emaClimbRange}-0), {sellRange}-0 > {buyRange}-0)), \"Undefined\")";
+                    $"=IFERROR(AVERAGE(FILTER(({emaClimbRange}-0), {sellRange}-0 >= {profitTakingPricesRange}-0)), \"Undefined\")";
 
                 ws.Cells[emaPercentBasedavgLossRow, 2].Formula =
-                    $"=IFERROR(AVERAGE(FILTER(-1*({emaClimbRange}-0), {buyRange}-0 > {sellRange}-0)), \"Undefined\")";
+                    $"=IFERROR(AVERAGE(FILTER(-1*({emaClimbRange}-0), {profitTakingPricesRange}-0 > {sellRange}-0)), \"Undefined\")";
 
 
                 // ---------------------------------------------
@@ -433,14 +433,14 @@ class Program
                 // (# rows where Sell > Buy) / total rows
                 // ---------------------------------------------
                 ws.Cells[emaPercentBasedoddsProfitRow, 2].Formula =
-                    $"=IFERROR(ROWS(FILTER({sellRange}-0, {sellRange}-0 > {buyRange}-0)) / ROWS({sellRange}-0), 0)";
+                    $"=IFERROR(ROWS(FILTER({sellRange}-0, {sellRange}-0 >= {profitTakingPricesRange}-0)) / ROWS({sellRange}-0), 0)";
 
                 // ---------------------------------------------
                 // Odds of Loss
                 // (# rows where Buy > Sell) / total rows
                 // ---------------------------------------------
                 ws.Cells[emaPercentBasedoddsLossRow, 2].Formula =
-                    $"=IFERROR(ROWS(FILTER({buyRange}-0, {buyRange}-0 > {sellRange}-0)) / ROWS({buyRange}-0), 0)";
+                    $"=IFERROR(ROWS(FILTER({buyRange}-0, {profitTakingPricesRange}-0 > {sellRange}-0)) / ROWS({buyRange}-0), 0)";
 
                 // ---------------------------------------------
                 // Required Profit to Break Even (Ema%-Based)
