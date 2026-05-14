@@ -2,6 +2,7 @@
 using OfficeOpenXml.Drawing.Chart;
 using System;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 
 class Program
@@ -73,7 +74,18 @@ class Program
 
                         for (int col = 1; col <= cells.Length; col++)
                         {
-                            ws.Cells[row, col].Value = cells[col - 1];
+                            var raw = (cells[col - 1] ?? string.Empty).Trim();
+
+                            // Try parse as number (InvariantCulture first, then CurrentCulture)
+                            if (double.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var dv) ||
+                                double.TryParse(raw, NumberStyles.Any, CultureInfo.CurrentCulture, out dv))
+                            {
+                                ws.Cells[row, col].Value = dv;
+                            }
+                            else
+                            {
+                                ws.Cells[row, col].Value = raw;
+                            }
                         }
 
                         row++;
@@ -129,6 +141,31 @@ class Program
                 int dataEndRow = row - 1;
 
                 int lastColumn = ws.Dimension.End.Column;
+
+                // Convert imported data (header row + data rows) into an Excel Table so
+                // the calculated summary blocks below stay outside the table.
+                // Headers are assumed to be on row 1 and data from dataStartRow..dataEndRow.
+               
+                 
+                /*try
+                {
+                    if (dataEndRow >= 1 && lastColumn >= 1)
+                    {
+                        // sanitize table name
+                        var safeName = System.Text.RegularExpressions.Regex.Replace(sheetName ?? "Sheet", "[^A-Za-z0-9_]", "_");
+                        var tableName = "tbl_" + safeName;
+
+                        var tableRange = ws.Cells[1, 1, dataEndRow, lastColumn];
+                        var table = ws.Tables.Add(tableRange, tableName);
+                        table.ShowHeader = true;
+                        table.ShowFilter = true;
+                        table.TableStyle = OfficeOpenXml.Table.TableStyles.Medium2;
+                    }
+                }
+                catch
+                {
+                    // ignore table creation failures (will not stop workbook creation)
+                }*/
 
                 // Summary rows
                 int summaryRow1 = row + 1;
