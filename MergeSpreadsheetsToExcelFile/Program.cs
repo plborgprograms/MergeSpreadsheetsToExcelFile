@@ -142,30 +142,7 @@ class Program
 
                 int lastColumn = ws.Dimension.End.Column;
 
-                // Convert imported data (header row + data rows) into an Excel Table so
-                // the calculated summary blocks below stay outside the table.
-                // Headers are assumed to be on row 1 and data from dataStartRow..dataEndRow.
-               
-                 
-                /*try
-                {
-                    if (dataEndRow >= 1 && lastColumn >= 1)
-                    {
-                        // sanitize table name
-                        var safeName = System.Text.RegularExpressions.Regex.Replace(sheetName ?? "Sheet", "[^A-Za-z0-9_]", "_");
-                        var tableName = "tbl_" + safeName;
-
-                        var tableRange = ws.Cells[1, 1, dataEndRow, lastColumn];
-                        var table = ws.Tables.Add(tableRange, tableName);
-                        table.ShowHeader = true;
-                        table.ShowFilter = true;
-                        table.TableStyle = OfficeOpenXml.Table.TableStyles.Medium2;
-                    }
-                }
-                catch
-                {
-                    // ignore table creation failures (will not stop workbook creation)
-                }*/
+                
 
                 // Summary rows
                 int summaryRow1 = row + 1;
@@ -537,6 +514,33 @@ class Program
 
                 chart.SetPosition(emaPercentBasedreqProfitRow + 3, 0, 3, 0);
                 chart.SetSize(800, 500);
+
+
+
+
+                int newLastColumn = ws.Dimension.End.Column;
+                // Convert imported data (header row + data rows) into an Excel Table so
+                // the calculated summary blocks below stay outside the table.
+                // Headers are assumed to be on row 1 and data from dataStartRow..dataEndRow.
+                try
+                {
+                    if (dataEndRow >= 1 && lastColumn >= 1)
+                    {
+                        // sanitize table name
+                        var safeName = System.Text.RegularExpressions.Regex.Replace(sheetName ?? "Sheet", "[^A-Za-z0-9_]", "_");
+                        var tableName = "tbl_" + safeName;
+
+                        var tableRange = ws.Cells[1, 1, dataEndRow, newLastColumn];
+                        var table = ws.Tables.Add(tableRange, tableName);
+                        table.ShowHeader = true;
+                        table.ShowFilter = true;
+                        table.TableStyle = OfficeOpenXml.Table.TableStyles.Medium2;
+                    }
+                }
+                catch
+                {
+                    // ignore table creation failures (will not stop workbook creation)
+                }
 
             }
 
