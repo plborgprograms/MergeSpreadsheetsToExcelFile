@@ -234,10 +234,10 @@ class Program
                     string colRange = $"{colLetter}{dataStartRow}:{colLetter}{dataEndRow}";
 
                     // Avg Sell > Buy (now: sell >= profit taking price for win)
-                    ws.Cells[summaryRow1, col].Formula = $"=IFERROR(AVERAGE(FILTER({colRange}-0, {sellRange}-0 >= {profitTakingPricesRange}-0)), \"Undefined\")";
+                    ws.Cells[summaryRow1, col].Formula = $"=IFERROR(AVERAGE(FILTER({colRange}-0, {sellRange}-0 >= {buyRange}-0)), \"Undefined\")";
 
                     // Avg Buy > Sell
-                    ws.Cells[summaryRow2, col].Formula = $"=IFERROR(AVERAGE(FILTER({colRange}-0, {profitTakingPricesRange}-0 > {sellRange}-0)), \"Undefined\")";
+                    ws.Cells[summaryRow2, col].Formula = $"=IFERROR(AVERAGE(FILTER({colRange}-0, {buyRange}-0 > {sellRange}-0)), \"Undefined\")";
 
 
                     // Conditional formatting for summaryRow1
