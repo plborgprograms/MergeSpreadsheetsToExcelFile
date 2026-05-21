@@ -518,6 +518,22 @@ class Program
 
 
 
+
+                //Add a new total profit/Loss row at the end based on the second to last column;
+                int TotalProfitRow = (riskBasedSpacer * 4) + row + 1 + 1;
+                ws.Cells[TotalProfitRow, 1].Value = "Total Profit:";
+                int totalProfitCol = riskWeightedProfitCol;
+                string totalProfitColLetter = ColLetter(totalProfitCol);
+                string totalProfitRange = $"{totalProfitColLetter}{dataStartRow}:{totalProfitColLetter}{dataEndRow}"; //profitTakingPrices column
+
+                // Sum of the total profit helper column (coerce errors if any)
+                ws.Cells[TotalProfitRow, 2].Formula =
+                    $"=IFERROR(SUM({totalProfitRange}), \"Undefined\")";
+
+
+
+
+
                 int newLastColumn = ws.Dimension.End.Column;
                 // Convert imported data (header row + data rows) into an Excel Table so
                 // the calculated summary blocks below stay outside the table.
