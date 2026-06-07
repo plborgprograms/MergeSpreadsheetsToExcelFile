@@ -28,9 +28,20 @@ class Program
             string name = Path.GetFileNameWithoutExtension(csv);
             string group = name.Split('_').Last();   // e.g., "Entries"
 
-            if (!groups.ContainsKey(group))
-                groups[group] = new List<string>();
+            if(groups.ContainsKey("profitResults"))
+            {
+                group = "profitResults";
+            }
+            else if (groups.ContainsKey("orderTotalsResults"))
+            {
+                group = "orderTotalsResults";
+            }
 
+
+            if (!groups.ContainsKey(group))
+            {
+                groups[group] = new List<string>();
+            }
             groups[group].Add(csv);
         }
 
@@ -454,7 +465,7 @@ class Program
                 // (# rows where Buy > Sell) / total rows
                 // ---------------------------------------------
                 ws.Cells[emaPercentBasedoddsLossRow, 2].Formula =
-                    $"=IFERROR(ROWS(FILTER({buyRange}-0, {profitTakingPricesRange}-0 > {sellRange}-0)) / ROWS({buyRange}-0), 0)";
+                    $"=IFERROR(ROWS(FILTER({buyRange}-0, {profitTakingPricesRange}-0 > {sellRange}-0.01)) / ROWS({buyRange}-0), 0)";
 
                 // ---------------------------------------------
                 // Required Profit to Break Even (Ema%-Based)
@@ -481,11 +492,15 @@ class Program
                 int riskWeightedProfitCol = lastColumn + 1;
                 string profitColLetter = ColLetter(riskWeightedProfitCol);
 
+                double commissionAmount = 0.01;
+                string commissionString = commissionAmount.ToString();
                 // Build helper column
                 for (int r = dataStartRow; r <= dataEndRow; r++)
                 {
                     ws.Cells[r, riskWeightedProfitCol].Formula =
-                        $"=IFERROR((({sellColLetter}{r}-0)-({buyColLetter}{r}-0)) * (({col10L}{r}-0)/({col9L}{r}-0)), 0)";
+                         $"=IFERROR((({sellColLetter}{r}-0)-({buyColLetter}{r}-0)-{commissionString}) * (({col10L}{r}-0)/({col9L}{r}-0)), 0)";
+                    //ws.Cells[r, riskWeightedProfitCol].Formula =
+                    //    $"=IFERROR((({sellColLetter}{r}-0)-({buyColLetter}{r}-0)) * (({col10L}{r}-0)/({col9L}{r}-0)), 0)";
                 }
 
                 // Build chart (fully qualified ranges)
