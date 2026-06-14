@@ -7,6 +7,65 @@ using System.IO;
 
 class Program
 {
+    static int FindColumnByHeader(ExcelWorksheet ws, int lastColumn, params string[] headerNames)
+    {
+        for (int col = 1; col <= lastColumn; col++)
+        {
+            string header = Convert.ToString(ws.Cells[1, col].Value)?.Trim() ?? string.Empty;
+            foreach (string headerName in headerNames)
+            {
+                if (string.Equals(header, headerName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return col;
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    static int AddTargetOptimizationTable(
+        ExcelWorksheet ws,
+        int startRow,
+        string title,
+        string unitLabel,
+        string maxFavorableRange,
+        string realizedRange)
+    {
+        double[] candidates = { 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0 };
+
+        ws.Cells[startRow, 1].Value = title;
+        ws.Cells[startRow + 1, 1].Value = unitLabel;
+        ws.Cells[startRow + 1, 2].Value = "Hit Rate";
+        ws.Cells[startRow + 1, 3].Value = "Avg Non-Hit Realized";
+        ws.Cells[startRow + 1, 4].Value = "Expected Value";
+
+        int firstCandidateRow = startRow + 2;
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            int currentRow = firstCandidateRow + i;
+            string candidateValue = candidates[i].ToString(CultureInfo.InvariantCulture);
+            ws.Cells[currentRow, 1].Value = candidates[i];
+            ws.Cells[currentRow, 2].Formula =
+                $"=IFERROR(ROWS(FILTER({maxFavorableRange}-0, {maxFavorableRange}-0 >= {candidateValue})) / ROWS({maxFavorableRange}), 0)";
+            ws.Cells[currentRow, 3].Formula =
+                $"=IFERROR(AVERAGE(FILTER({realizedRange}-0, {maxFavorableRange}-0 < {candidateValue})), 0)";
+            ws.Cells[currentRow, 4].Formula =
+                $"=IFERROR(({ws.Cells[currentRow, 2].Address}*{candidateValue}) + ((1-{ws.Cells[currentRow, 2].Address})*{ws.Cells[currentRow, 3].Address}), 0)";
+        }
+
+        int bestRow = firstCandidateRow + candidates.Length + 1;
+        int lastCandidateRow = firstCandidateRow + candidates.Length - 1;
+        ws.Cells[bestRow, 1].Value = $"Best {unitLabel}:";
+        ws.Cells[bestRow, 2].Formula =
+            $"=IFERROR(INDEX(A{firstCandidateRow}:A{lastCandidateRow}, MATCH(MAX(D{firstCandidateRow}:D{lastCandidateRow}), D{firstCandidateRow}:D{lastCandidateRow}, 0)), \"Undefined\")";
+        ws.Cells[bestRow + 1, 1].Value = $"Best {unitLabel} Expected Value:";
+        ws.Cells[bestRow + 1, 2].Formula =
+            $"=IFERROR(MAX(D{firstCandidateRow}:D{lastCandidateRow}), \"Undefined\")";
+
+        return bestRow + 3;
+    }
+
     static void Main(string[] args)
     {
         // Set EPPlus license context (required)
@@ -426,12 +485,10 @@ class Program
 
 
                 //New indicator for ema% risk 
-                int colEmaClimb = 29;// 28; shift one for new column
-                string emaClimbColLetter = ColLetter(colEmaClimb);
+                int colEmaClimb = FindColumnByHeader(ws, lastColumn, "realizedProfitIn5mSpread", "MovementIn5mEmaSpread");
+                string emaClimbColLetter = colEmaClimb > 0 ? ColLetter(colEmaClimb) : ColLetter(29);
 
-                //MovementIn5mEmaSpread
-
-                string emaClimbRange = $"{emaClimbColLetter}{dataStartRow}:{emaClimbColLetter}{dataEndRow}"; //profitTakingPrices column
+                string emaClimbRange = $"{emaClimbColLetter}{dataStartRow}:{emaClimbColLetter}{dataEndRow}";
 
                 // ---------------------------------------------
                 // Summary row positions
@@ -491,6 +548,38 @@ class Program
 
                 //end new indicator for ema% risk
 
+                int maxFavorableSpreadCol = FindColumnByHeader(ws, lastColumn, "maxFavorableExcursionIn5mSpread");
+                int realizedSpreadCol = FindColumnByHeader(ws, lastColumn, "realizedProfitIn5mSpread");
+                int maxFavorableRCol = FindColumnByHeader(ws, lastColumn, "maxFavorableExcursionInR");
+                int realizedRCol = FindColumnByHeader(ws, lastColumn, "realizedProfitInR");
+                int pathBasedStartRow = (riskBasedSpacer * 4) + row + 1 + 1;
+
+                if (maxFavorableSpreadCol > 0 && realizedSpreadCol > 0)
+                {
+                    string maxFavorableSpreadRange = $"{ColLetter(maxFavorableSpreadCol)}{dataStartRow}:{ColLetter(maxFavorableSpreadCol)}{dataEndRow}";
+                    string realizedSpreadRange = $"{ColLetter(realizedSpreadCol)}{dataStartRow}:{ColLetter(realizedSpreadCol)}{dataEndRow}";
+                    pathBasedStartRow = AddTargetOptimizationTable(
+                        ws,
+                        pathBasedStartRow,
+                        "Path-Based Target Optimization (5m EMA Spread)",
+                        "Spread Multiple",
+                        maxFavorableSpreadRange,
+                        realizedSpreadRange);
+                }
+
+                if (maxFavorableRCol > 0 && realizedRCol > 0)
+                {
+                    string maxFavorableRRange = $"{ColLetter(maxFavorableRCol)}{dataStartRow}:{ColLetter(maxFavorableRCol)}{dataEndRow}";
+                    string realizedRRange = $"{ColLetter(realizedRCol)}{dataStartRow}:{ColLetter(realizedRCol)}{dataEndRow}";
+                    pathBasedStartRow = AddTargetOptimizationTable(
+                        ws,
+                        pathBasedStartRow,
+                        "Path-Based Target Optimization (Per-Buy-Setup R)",
+                        "R Multiple",
+                        maxFavorableRRange,
+                        realizedRRange);
+                }
+
 
 
 
@@ -548,7 +637,7 @@ class Program
 
 
                 //Add a new total profit/Loss row at the end based on the second to last column;
-                int TotalProfitRow = (riskBasedSpacer * 4) + row + 1 + 1;
+                int TotalProfitRow = pathBasedStartRow + 1;
                 ws.Cells[TotalProfitRow, 1].Value = "Total Profit:";
                 int totalProfitCol = riskWeightedProfitCol;
                 string totalProfitColLetter = ColLetter(totalProfitCol);
