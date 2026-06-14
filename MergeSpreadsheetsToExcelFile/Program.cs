@@ -7,6 +7,14 @@ using System.IO;
 
 class Program
 {
+    record ProfitTakingConfigRow(
+        string Signal,
+        bool Enabled,
+        double BestSpreadMultiple,
+        double BestSpreadExpectedValue,
+        double BestRMultiple,
+        double BestRExpectedValue);
+
     static int FindColumnByHeader(ExcelWorksheet ws, int lastColumn, params string[] headerNames)
     {
         for (int col = 1; col <= lastColumn; col++)
@@ -66,15 +74,110 @@ class Program
         return bestRow + 3;
     }
 
+    static double CellDouble(ExcelWorksheet ws, int row, int col)
+    {
+        object value = ws.Cells[row, col].Value;
+        if (value is double d)
+        {
+            return d;
+        }
+        if (value is int i)
+        {
+            return i;
+        }
+        if (double.TryParse(Convert.ToString(value), NumberStyles.Any, CultureInfo.InvariantCulture, out double parsed))
+        {
+            return parsed;
+        }
+
+        return 0;
+    }
+
+    static (double multiple, double expectedValue) FindBestMultiple(
+        ExcelWorksheet ws,
+        int dataStartRow,
+        int dataEndRow,
+        int maxFavorableCol,
+        int realizedCol)
+    {
+        double[] candidates = { 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0 };
+        double bestMultiple = candidates[0];
+        double bestExpectedValue = double.NegativeInfinity;
+
+        foreach (double candidate in candidates)
+        {
+            int total = 0;
+            int hits = 0;
+            double nonHitTotal = 0;
+            int nonHitCount = 0;
+
+            for (int row = dataStartRow; row <= dataEndRow; row++)
+            {
+                double maxFavorable = CellDouble(ws, row, maxFavorableCol);
+                double realized = CellDouble(ws, row, realizedCol);
+                total++;
+
+                if (maxFavorable >= candidate)
+                {
+                    hits++;
+                }
+                else
+                {
+                    nonHitTotal += realized;
+                    nonHitCount++;
+                }
+            }
+
+            if (total == 0)
+            {
+                continue;
+            }
+
+            double hitRate = hits / (double)total;
+            double averageNonHit = nonHitCount > 0 ? nonHitTotal / nonHitCount : 0;
+            double expectedValue = (hitRate * candidate) + ((1.0 - hitRate) * averageNonHit);
+
+            if (expectedValue > bestExpectedValue)
+            {
+                bestExpectedValue = expectedValue;
+                bestMultiple = candidate;
+            }
+        }
+
+        return (bestMultiple, bestExpectedValue);
+    }
+
+    static void WriteProfitTakingConfig(string targetPath, IReadOnlyList<ProfitTakingConfigRow> rows)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+        using var writer = new StreamWriter(targetPath, false);
+        writer.WriteLine("signal,enabled,bestSpreadMultiple,bestSpreadExpectedValue,bestRMultiple,bestRExpectedValue");
+        foreach (var row in rows)
+        {
+            writer.WriteLine(string.Join(",",
+                row.Signal,
+                row.Enabled ? "1" : "0",
+                row.BestSpreadMultiple.ToString(CultureInfo.InvariantCulture),
+                row.BestSpreadExpectedValue.ToString(CultureInfo.InvariantCulture),
+                row.BestRMultiple.ToString(CultureInfo.InvariantCulture),
+                row.BestRExpectedValue.ToString(CultureInfo.InvariantCulture)));
+        }
+    }
+
     static void Main(string[] args)
     {
         // Set EPPlus license context (required)
         ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
         //ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
 
-        string inputDir =  @"C:\Eclipse-workspace\TWS API\samples\Cpp\Output Data";
-        string outputDir = @"C:\Eclipse-workspace\TWS API\samples\Cpp\MergedCsvs";
+        string inputDir = Environment.GetEnvironmentVariable("AI_OUTPUT_DATA_DIR") ?? @"C:\Eclipse-workspace\TWS API\samples\Cpp\Output Data";
+        string outputDir = Environment.GetEnvironmentVariable("AI_MERGED_OUTPUT_DIR") ?? @"C:\Eclipse-workspace\TWS API\samples\Cpp\MergedCsvs";
         string outputFile = Path.Combine(outputDir, "MergedOutput.xlsx");
+        string runStamp = Environment.GetEnvironmentVariable("AI_PROFIT_OPTIMIZATION_RUN") ?? DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+        string runOutputDir = Path.Combine(outputDir, "MergedOutput", runStamp);
+        string runConfigPath = Path.Combine(runOutputDir, "ProfitTakingConfig.csv");
+        string latestConfigPath = Path.Combine(outputDir, "MergedOutput", "latest", "ProfitTakingConfig.csv");
+        var configRows = new List<ProfitTakingConfigRow>();
 
         var csvFiles = Directory.GetFiles(inputDir, "*.csv");
 
@@ -580,6 +683,20 @@ class Program
                         realizedRRange);
                 }
 
+                if (maxFavorableSpreadCol > 0 && realizedSpreadCol > 0 && maxFavorableRCol > 0 && realizedRCol > 0)
+                {
+                    var bestSpread = FindBestMultiple(ws, dataStartRow, dataEndRow, maxFavorableSpreadCol, realizedSpreadCol);
+                    var bestR = FindBestMultiple(ws, dataStartRow, dataEndRow, maxFavorableRCol, realizedRCol);
+                    bool enabled = bestSpread.expectedValue > 0 || bestR.expectedValue > 0;
+                    configRows.Add(new ProfitTakingConfigRow(
+                        sheetName,
+                        enabled,
+                        bestSpread.multiple,
+                        bestSpread.expectedValue,
+                        bestR.multiple,
+                        bestR.expectedValue));
+                }
+
 
 
 
@@ -680,6 +797,11 @@ class Program
             package.SaveAs(new FileInfo(outputFile));
         }
 
+        WriteProfitTakingConfig(runConfigPath, configRows);
+        WriteProfitTakingConfig(latestConfigPath, configRows);
+
         Console.WriteLine("Excel workbook created at: " + outputFile);
+        Console.WriteLine("Profit taking config created at: " + runConfigPath);
+        Console.WriteLine("Latest profit taking config updated at: " + latestConfigPath);
     }
 }
