@@ -28,11 +28,11 @@ class Program
             string name = Path.GetFileNameWithoutExtension(csv);
             string group = name.Split('_').Last();   // e.g., "Entries"
 
-            if(groups.ContainsKey("profitResults"))
+            if (name.EndsWith("profitResults", StringComparison.OrdinalIgnoreCase))
             {
                 group = "profitResults";
             }
-            else if (groups.ContainsKey("orderTotalsResults"))
+            else if (name.EndsWith("orderTotalsResults", StringComparison.OrdinalIgnoreCase))
             {
                 group = "orderTotalsResults";
             }
@@ -183,6 +183,9 @@ class Program
                 int oddsProfitRow = row + 3;
                 int oddsLossRow = row + 4;
                 int reqProfitRow = row + 5;
+                int targetWinRateProfitRow = row + 6;
+                int targetWinRatePriceRow = row + 7;
+                int targetWinRateBreakEvenRow = row + 8;
 
                 string buyColLetter = ColLetter(colBuy);
                 string sellColLetter = ColLetter(colSell);
@@ -190,6 +193,11 @@ class Program
 
                 string buyRange = $"{buyColLetter}{dataStartRow}:{buyColLetter}{dataEndRow}";
                 string sellRange = $"{sellColLetter}{dataStartRow}:{sellColLetter}{dataEndRow}";
+                double commissionPerShare = 0.01;
+                string commissionString = commissionPerShare.ToString(CultureInfo.InvariantCulture);
+                double targetWinRate = 2.0 / 3.0;
+                string targetWinRateString = targetWinRate.ToString(CultureInfo.InvariantCulture);
+                string netPerShareRange = $"(({sellRange}-0)-({buyRange}-0)-{commissionString})";
 
 
                 string profitTakingPricesRange = $"{ColLetter(17)}{dataStartRow}:{ColLetter(17)}{dataEndRow}"; //profitTakingPrices column
@@ -204,6 +212,9 @@ class Program
                 ws.Cells[oddsProfitRow, 1].Value = "Odds of Profit:";
                 ws.Cells[oddsLossRow, 1].Value = "Odds of Loss:";
                 ws.Cells[reqProfitRow, 1].Value = "Required Profit to Break Even:";
+                ws.Cells[targetWinRateProfitRow, 1].Value = "Profit/Share Target for 2/3 Hit Rate:";
+                ws.Cells[targetWinRatePriceRow, 1].Value = "Typical Price Target for 2/3 Hit Rate:";
+                ws.Cells[targetWinRateBreakEvenRow, 1].Value = "Break-Even Profit/Share at 2/3:";
 
                 // Weighted Avg Profit
                 ws.Cells[avgProfitRow, 2].Formula =
@@ -235,6 +246,16 @@ class Program
                 // Here "Risk" = average weighted loss
                 ws.Cells[reqProfitRow, 2].Formula =
                     $"=IFERROR(({ws.Cells[avgLossRow, 2].Address} * (1 - {ws.Cells[oddsProfitRow, 2].Address})) / {ws.Cells[oddsProfitRow, 2].Address}, \"Undefined\")";
+
+                // Non-circular target: this uses the net per-share move distribution,
+                // not the current profitTakingLmtPrice. If this value is <= 0,
+                // the data set did not support a positive 2/3 hit-rate target.
+                ws.Cells[targetWinRateProfitRow, 2].Formula =
+                    $"=IFERROR(PERCENTILE.INC({netPerShareRange}, 1-{targetWinRateString}), \"Undefined\")";
+                ws.Cells[targetWinRatePriceRow, 2].Formula =
+                    $"=IFERROR(AVERAGE({buyRange}) + {ws.Cells[targetWinRateProfitRow, 2].Address}, \"Undefined\")";
+                ws.Cells[targetWinRateBreakEvenRow, 2].Formula =
+                    $"=IFERROR({ws.Cells[avgLossRow, 2].Address} * (1-{targetWinRateString}) / {targetWinRateString}, \"Undefined\")";
 
 
 
@@ -279,7 +300,7 @@ class Program
                 // SUMMARY ROWS: Risk-Based Profitability Analytics
                 // ---------------------------------------------
 
-                int riskBasedSpacer = 6; //extra space before starting the risk weighted section
+                int riskBasedSpacer = 10; //extra space before starting the risk weighted section
                 // ---------------------------------------------
                 // Summary row positions
                 // ---------------------------------------------
@@ -297,12 +318,6 @@ class Program
                 ws.Cells[riskBasedoddsProfitRow, 1].Value = "Odds of Profit:";
                 ws.Cells[riskBasedoddsLossRow, 1].Value = "Odds of Loss:";
                 ws.Cells[riskBasedreqProfitRow, 1].Value = "Required Profit to Break Even:";
-
-                // ---------------------------------------------
-                // RISK PER TRADE (SET THIS VALUE)
-                // ---------------------------------------------
-                double riskPerTrade = 40;   // <<< YOU SET THIS (example: $40 risk per trade)
-
 
                 // ---------------------------------------------
                 // Risk-Based Weighted Avg Profit
@@ -492,8 +507,6 @@ class Program
                 int riskWeightedProfitCol = lastColumn + 1;
                 string profitColLetter = ColLetter(riskWeightedProfitCol);
 
-                double commissionAmount = 0.01;
-                string commissionString = commissionAmount.ToString();
                 // Build helper column
                 for (int r = dataStartRow; r <= dataEndRow; r++)
                 {
