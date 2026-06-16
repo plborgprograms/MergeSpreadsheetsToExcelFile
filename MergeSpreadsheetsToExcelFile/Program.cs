@@ -323,9 +323,13 @@ class Program
 
         string inputDir = Environment.GetEnvironmentVariable("AI_OUTPUT_DATA_DIR") ?? @"C:\Eclipse-workspace\TWS API\samples\Cpp\Output Data";
         string outputDir = Environment.GetEnvironmentVariable("AI_MERGED_OUTPUT_DIR") ?? @"C:\Eclipse-workspace\TWS API\samples\Cpp\MergedCsvs";
-        string outputFile = Path.Combine(outputDir, "MergedOutput.xlsx");
-        string runStamp = Environment.GetEnvironmentVariable("AI_PROFIT_OPTIMIZATION_RUN") ?? DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+        string? optimizationRunStamp = Environment.GetEnvironmentVariable("AI_PROFIT_OPTIMIZATION_RUN");
+        bool isProfitOptimizationRun = !string.IsNullOrWhiteSpace(optimizationRunStamp);
+        string runStamp = isProfitOptimizationRun ? optimizationRunStamp! : DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
         string runOutputDir = Path.Combine(outputDir, "MergedOutput", runStamp);
+        string outputFile = isProfitOptimizationRun
+            ? Path.Combine(runOutputDir, "MergedOutput.xlsx")
+            : Path.Combine(outputDir, "MergedOutput.xlsx");
         string runConfigPath = Path.Combine(runOutputDir, "ProfitTakingConfig.csv");
         string latestConfigPath = Path.Combine(outputDir, "MergedOutput", "latest", "ProfitTakingConfig.csv");
         var configRows = new List<ProfitTakingConfigRow>();
@@ -361,6 +365,11 @@ class Program
 
 
         Console.WriteLine("Creating Excel workbook created at: " + outputFile);
+        string? outputFileDirectory = Path.GetDirectoryName(outputFile);
+        if (!string.IsNullOrEmpty(outputFileDirectory))
+        {
+            Directory.CreateDirectory(outputFileDirectory);
+        }
 
         using (var package = new ExcelPackage())
         {
