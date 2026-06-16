@@ -15,6 +15,12 @@ class Program
         double BestRMultiple,
         double BestRExpectedValue);
 
+    record ProfitResultRow(
+        string SourceFile,
+        string Date,
+        string Symbol,
+        double ProfitLoss);
+
     static int FindColumnByHeader(ExcelWorksheet ws, int lastColumn, params string[] headerNames)
     {
         for (int col = 1; col <= lastColumn; col++)
@@ -161,6 +167,151 @@ class Program
                 row.BestSpreadExpectedValue.ToString(CultureInfo.InvariantCulture),
                 row.BestRMultiple.ToString(CultureInfo.InvariantCulture),
                 row.BestRExpectedValue.ToString(CultureInfo.InvariantCulture)));
+        }
+    }
+
+    static string StripLogPrefix(string line)
+    {
+        int infoIndex = line.IndexOf("] [info] ", StringComparison.Ordinal);
+        return infoIndex >= 0 ? line[(infoIndex + "] [info] ".Length)..] : line;
+    }
+
+    static List<string> ParseCsvCells(string line)
+    {
+        var cells = new List<string>();
+        var cell = new System.Text.StringBuilder();
+        bool inQuotes = false;
+
+        foreach (char ch in line)
+        {
+            if (ch == '"')
+            {
+                inQuotes = !inQuotes;
+            }
+            else if (ch == ',' && !inQuotes)
+            {
+                cells.Add(cell.ToString().Trim());
+                cell.Clear();
+            }
+            else
+            {
+                cell.Append(ch);
+            }
+        }
+
+        cells.Add(cell.ToString().Trim());
+        return cells.Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+    }
+
+    static List<ProfitResultRow> ReadProfitResultRows(IEnumerable<string> profitResultFiles)
+    {
+        var rows = new List<ProfitResultRow>();
+
+        foreach (string path in profitResultFiles)
+        {
+            var dataRows = new List<List<string>>();
+            foreach (string rawLine in File.ReadLines(path))
+            {
+                string line = StripLogPrefix(rawLine).Trim();
+                if (string.IsNullOrWhiteSpace(line) ||
+                    line.StartsWith("Log of ", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var cells = ParseCsvCells(line);
+                if (cells.Count > 0)
+                {
+                    dataRows.Add(cells);
+                }
+            }
+
+            if (dataRows.Count < 3)
+            {
+                continue;
+            }
+
+            List<string> dates = dataRows[0];
+            List<string> symbols = dataRows[1];
+            List<string> profits = dataRows[2];
+            int count = Math.Min(dates.Count, Math.Min(symbols.Count, profits.Count));
+
+            for (int i = 0; i < count; i++)
+            {
+                if (!double.TryParse(profits[i], NumberStyles.Any, CultureInfo.InvariantCulture, out double profitLoss) &&
+                    !double.TryParse(profits[i], NumberStyles.Any, CultureInfo.CurrentCulture, out profitLoss))
+                {
+                    continue;
+                }
+
+                rows.Add(new ProfitResultRow(
+                    Path.GetFileName(path),
+                    dates[i],
+                    symbols[i],
+                    profitLoss));
+            }
+        }
+
+        return rows;
+    }
+
+    static void AddGrandTotalWorksheet(ExcelPackage package, IReadOnlyList<string> profitResultFiles)
+    {
+        var ws = package.Workbook.Worksheets.Add("Grand Total");
+        var profitRows = ReadProfitResultRows(profitResultFiles);
+
+        ws.Cells[1, 1].Value = "Metric";
+        ws.Cells[1, 2].Value = "Value";
+        ws.Cells[2, 1].Value = "Grand Total Profit/Loss";
+        ws.Cells[3, 1].Value = "Stock/Day Rows";
+        ws.Cells[4, 1].Value = "Winning Stock/Day Rows";
+        ws.Cells[5, 1].Value = "Losing Stock/Day Rows";
+        ws.Cells[6, 1].Value = "Average Profit/Loss Per Stock/Day";
+        ws.Cells[7, 1].Value = "Source";
+        ws.Cells[7, 2].Value = profitRows.Count > 0
+            ? "Computed from profitResults files, not signal sheets, to avoid double-counting overlapping signals."
+            : "No profitResults files were found in the input directory.";
+
+        int headerRow = 9;
+        ws.Cells[headerRow, 1].Value = "SourceFile";
+        ws.Cells[headerRow, 2].Value = "Date";
+        ws.Cells[headerRow, 3].Value = "Symbol";
+        ws.Cells[headerRow, 4].Value = "Profit/Loss";
+
+        int row = headerRow + 1;
+        foreach (var profitRow in profitRows)
+        {
+            ws.Cells[row, 1].Value = profitRow.SourceFile;
+            ws.Cells[row, 2].Value = profitRow.Date;
+            ws.Cells[row, 3].Value = profitRow.Symbol;
+            ws.Cells[row, 4].Value = profitRow.ProfitLoss;
+            row++;
+        }
+
+        int dataStartRow = headerRow + 1;
+        int dataEndRow = Math.Max(dataStartRow, row - 1);
+        string profitRange = $"D{dataStartRow}:D{dataEndRow}";
+
+        ws.Cells[2, 2].Formula = profitRows.Count > 0 ? $"=SUM({profitRange})" : "0";
+        ws.Cells[3, 2].Formula = profitRows.Count > 0 ? $"=COUNTA(D{dataStartRow}:D{dataEndRow})" : "0";
+        ws.Cells[4, 2].Formula = profitRows.Count > 0 ? $"=COUNTIF({profitRange},\">0\")" : "0";
+        ws.Cells[5, 2].Formula = profitRows.Count > 0 ? $"=COUNTIF({profitRange},\"<0\")" : "0";
+        ws.Cells[6, 2].Formula = profitRows.Count > 0 ? $"=IFERROR(AVERAGE({profitRange}),0)" : "0";
+
+        ws.Cells[2, 2].Style.Numberformat.Format = "$#,##0.00;-$#,##0.00";
+        ws.Cells[3, 2, 5, 2].Style.Numberformat.Format = "#,##0";
+        ws.Cells[6, 2].Style.Numberformat.Format = "$#,##0.00;-$#,##0.00";
+        ws.Cells[headerRow + 1, 4, dataEndRow, 4].Style.Numberformat.Format = "$#,##0.00;-$#,##0.00";
+        ws.Cells[1, 1, 1, 2].Style.Font.Bold = true;
+        ws.Cells[headerRow, 1, headerRow, 4].Style.Font.Bold = true;
+        ws.Cells.AutoFitColumns();
+
+        if (profitRows.Count > 0)
+        {
+            var table = ws.Tables.Add(ws.Cells[headerRow, 1, dataEndRow, 4], "tbl_GrandTotalProfitResults");
+            table.ShowHeader = true;
+            table.ShowFilter = true;
+            table.TableStyle = OfficeOpenXml.Table.TableStyles.Medium4;
         }
     }
 
@@ -793,6 +944,9 @@ class Program
                 }
 
             }
+
+            groups.TryGetValue("profitResults", out var profitResultFiles);
+            AddGrandTotalWorksheet(package, profitResultFiles ?? new List<string>());
 
             package.SaveAs(new FileInfo(outputFile));
         }
