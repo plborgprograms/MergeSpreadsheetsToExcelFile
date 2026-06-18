@@ -321,9 +321,23 @@ class Program
         ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
         //ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
 
-        string inputDir = Environment.GetEnvironmentVariable("AI_OUTPUT_DATA_DIR") ?? @"C:\Eclipse-workspace\TWS API\samples\Cpp\Output Data";
-        string outputDir = Environment.GetEnvironmentVariable("AI_MERGED_OUTPUT_DIR") ?? @"C:\Eclipse-workspace\TWS API\samples\Cpp\MergedCsvs";
-        string? optimizationRunStamp = Environment.GetEnvironmentVariable("AI_PROFIT_OPTIMIZATION_RUN");
+        static string? FirstEnvironmentValue(params string[] names)
+        {
+            foreach (string name in names)
+            {
+                string? value = Environment.GetEnvironmentVariable(name);
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return null;
+        }
+
+        string inputDir = FirstEnvironmentValue("TRADING_OUTPUT_DATA_DIR", "AI_OUTPUT_DATA_DIR") ?? @"C:\Eclipse-workspace\TWS API\samples\Cpp\Output Data";
+        string outputDir = FirstEnvironmentValue("TRADING_MERGED_OUTPUT_DIR", "AI_MERGED_OUTPUT_DIR") ?? @"C:\Eclipse-workspace\TWS API\samples\Cpp\MergedCsvs";
+        string? optimizationRunStamp = FirstEnvironmentValue("TRADING_PROFIT_OPTIMIZATION_RUN", "AI_PROFIT_OPTIMIZATION_RUN");
         bool isProfitOptimizationRun = !string.IsNullOrWhiteSpace(optimizationRunStamp);
         string runStamp = isProfitOptimizationRun ? optimizationRunStamp! : DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
         string runOutputDir = Path.Combine(outputDir, "MergedOutput", runStamp);
