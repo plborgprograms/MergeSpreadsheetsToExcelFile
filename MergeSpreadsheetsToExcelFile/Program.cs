@@ -21,6 +21,12 @@ class Program
         string Symbol,
         double ProfitLoss);
 
+    record GrandTotalsResultRow(
+        string SourceFile,
+        double NetProfitAfterCommissions,
+        double CommissionCost,
+        double GrossProfitBeforeCommissions);
+
     static int FindColumnByHeader(ExcelWorksheet ws, int lastColumn, params string[] headerNames)
     {
         for (int col = 1; col <= lastColumn; col++)
@@ -255,28 +261,106 @@ class Program
         return rows;
     }
 
-    static void AddGrandTotalWorksheet(ExcelPackage package, IReadOnlyList<string> profitResultFiles)
+    static double ParseDoubleOrZero(string value)
+    {
+        if (double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out double parsed) ||
+            double.TryParse(value, NumberStyles.Any, CultureInfo.CurrentCulture, out parsed))
+        {
+            return parsed;
+        }
+
+        return 0;
+    }
+
+    static List<GrandTotalsResultRow> ReadGrandTotalsRows(IEnumerable<string> grandTotalsResultFiles)
+    {
+        var rows = new List<GrandTotalsResultRow>();
+
+        foreach (string path in grandTotalsResultFiles)
+        {
+            double netProfit = 0;
+            double commissionCost = 0;
+            double grossProfit = 0;
+            bool foundAny = false;
+
+            foreach (string rawLine in File.ReadLines(path))
+            {
+                string line = StripLogPrefix(rawLine).Trim();
+                if (string.IsNullOrWhiteSpace(line) ||
+                    line.StartsWith("Log of ", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var cells = ParseCsvCells(line);
+                if (cells.Count < 2 ||
+                    string.Equals(cells[0], "Metric", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string metric = cells[0];
+                double value = ParseDoubleOrZero(cells[1]);
+                if (metric.Contains("Net Profit", StringComparison.OrdinalIgnoreCase))
+                {
+                    netProfit = value;
+                    foundAny = true;
+                }
+                else if (metric.Contains("Commission", StringComparison.OrdinalIgnoreCase))
+                {
+                    commissionCost = value;
+                    foundAny = true;
+                }
+                else if (metric.Contains("Gross Profit", StringComparison.OrdinalIgnoreCase))
+                {
+                    grossProfit = value;
+                    foundAny = true;
+                }
+            }
+
+            if (foundAny)
+            {
+                rows.Add(new GrandTotalsResultRow(
+                    Path.GetFileName(path),
+                    netProfit,
+                    commissionCost,
+                    grossProfit));
+            }
+        }
+
+        return rows;
+    }
+
+    static void AddGrandTotalWorksheet(
+        ExcelPackage package,
+        IReadOnlyList<string> profitResultFiles,
+        IReadOnlyList<string> grandTotalsResultFiles)
     {
         var ws = package.Workbook.Worksheets.Add("Grand Total");
         var profitRows = ReadProfitResultRows(profitResultFiles);
+        var grandTotalsRows = ReadGrandTotalsRows(grandTotalsResultFiles);
 
         ws.Cells[1, 1].Value = "Metric";
         ws.Cells[1, 2].Value = "Value";
-        ws.Cells[2, 1].Value = "Grand Total Profit/Loss";
-        ws.Cells[3, 1].Value = "Stock/Day Rows";
-        ws.Cells[4, 1].Value = "Winning Stock/Day Rows";
-        ws.Cells[5, 1].Value = "Losing Stock/Day Rows";
-        ws.Cells[6, 1].Value = "Average Profit/Loss Per Stock/Day";
-        ws.Cells[7, 1].Value = "Source";
-        ws.Cells[7, 2].Value = profitRows.Count > 0
-            ? "Computed from profitResults files, not signal sheets, to avoid double-counting overlapping signals."
-            : "No profitResults files were found in the input directory.";
+        ws.Cells[2, 1].Value = "Net Profit After Commissions";
+        ws.Cells[3, 1].Value = "Commission Cost";
+        ws.Cells[4, 1].Value = "Gross Profit Before Commissions";
+        ws.Cells[5, 1].Value = "Stock/Day Rows";
+        ws.Cells[6, 1].Value = "Winning Stock/Day Rows";
+        ws.Cells[7, 1].Value = "Losing Stock/Day Rows";
+        ws.Cells[8, 1].Value = "Average Net Profit Per Stock/Day";
+        ws.Cells[9, 1].Value = "Source";
+        ws.Cells[9, 2].Value = grandTotalsRows.Count > 0
+            ? "Profit and commission totals are computed from grandTotalsResults files. Detail rows come from profitResults files."
+            : profitRows.Count > 0
+                ? "Net profit is computed from profitResults files. Commission and gross profit need grandTotalsResults files from a newer test run."
+                : "No profitResults or grandTotalsResults files were found in the input directory.";
 
-        int headerRow = 9;
+        int headerRow = 12;
         ws.Cells[headerRow, 1].Value = "SourceFile";
         ws.Cells[headerRow, 2].Value = "Date";
         ws.Cells[headerRow, 3].Value = "Symbol";
-        ws.Cells[headerRow, 4].Value = "Profit/Loss";
+        ws.Cells[headerRow, 4].Value = "Net Profit/Loss";
 
         int row = headerRow + 1;
         foreach (var profitRow in profitRows)
@@ -292,19 +376,30 @@ class Program
         int dataEndRow = Math.Max(dataStartRow, row - 1);
         string profitRange = $"D{dataStartRow}:D{dataEndRow}";
 
-        ws.Cells[2, 2].Formula = profitRows.Count > 0 ? $"=SUM({profitRange})" : "0";
-        ws.Cells[3, 2].Formula = profitRows.Count > 0 ? $"=COUNTA(D{dataStartRow}:D{dataEndRow})" : "0";
-        ws.Cells[4, 2].Formula = profitRows.Count > 0 ? $"=COUNTIF({profitRange},\">0\")" : "0";
-        ws.Cells[5, 2].Formula = profitRows.Count > 0 ? $"=COUNTIF({profitRange},\"<0\")" : "0";
-        ws.Cells[6, 2].Formula = profitRows.Count > 0 ? $"=IFERROR(AVERAGE({profitRange}),0)" : "0";
+        if (grandTotalsRows.Count > 0)
+        {
+            ws.Cells[2, 2].Value = grandTotalsRows.Sum(r => r.NetProfitAfterCommissions);
+            ws.Cells[3, 2].Value = grandTotalsRows.Sum(r => r.CommissionCost);
+            ws.Cells[4, 2].Value = grandTotalsRows.Sum(r => r.GrossProfitBeforeCommissions);
+        }
+        else
+        {
+            ws.Cells[2, 2].Formula = profitRows.Count > 0 ? $"=SUM({profitRange})" : "0";
+            ws.Cells[3, 2].Value = 0;
+            ws.Cells[4, 2].Formula = $"={ws.Cells[2, 2].Address}+{ws.Cells[3, 2].Address}";
+        }
+        ws.Cells[5, 2].Formula = profitRows.Count > 0 ? $"=COUNTA(D{dataStartRow}:D{dataEndRow})" : "0";
+        ws.Cells[6, 2].Formula = profitRows.Count > 0 ? $"=COUNTIF({profitRange},\">0\")" : "0";
+        ws.Cells[7, 2].Formula = profitRows.Count > 0 ? $"=COUNTIF({profitRange},\"<0\")" : "0";
+        ws.Cells[8, 2].Formula = profitRows.Count > 0 ? $"=IFERROR(AVERAGE({profitRange}),0)" : "0";
 
-        ws.Cells[2, 2].Style.Numberformat.Format = "$#,##0.00;-$#,##0.00";
-        ws.Cells[3, 2, 5, 2].Style.Numberformat.Format = "#,##0";
-        ws.Cells[6, 2].Style.Numberformat.Format = "$#,##0.00;-$#,##0.00";
+        ws.Cells[2, 2, 4, 2].Style.Numberformat.Format = "$#,##0.00;-$#,##0.00";
+        ws.Cells[5, 2, 7, 2].Style.Numberformat.Format = "#,##0";
+        ws.Cells[8, 2].Style.Numberformat.Format = "$#,##0.00;-$#,##0.00";
         ws.Cells[headerRow + 1, 4, dataEndRow, 4].Style.Numberformat.Format = "$#,##0.00;-$#,##0.00";
         ws.Cells[1, 1, 1, 2].Style.Font.Bold = true;
+        ws.Cells[2, 1, 4, 2].Style.Font.Bold = true;
         ws.Cells[headerRow, 1, headerRow, 4].Style.Font.Bold = true;
-        ws.Cells.AutoFitColumns();
 
         if (profitRows.Count > 0)
         {
@@ -313,6 +408,35 @@ class Program
             table.ShowFilter = true;
             table.TableStyle = OfficeOpenXml.Table.TableStyles.Medium4;
         }
+
+        int totalsHeaderRow = Math.Max(dataEndRow + 3, headerRow + 3);
+        ws.Cells[totalsHeaderRow, 1].Value = "Grand Totals Source File";
+        ws.Cells[totalsHeaderRow, 2].Value = "Net Profit After Commissions";
+        ws.Cells[totalsHeaderRow, 3].Value = "Commission Cost";
+        ws.Cells[totalsHeaderRow, 4].Value = "Gross Profit Before Commissions";
+
+        int totalsRow = totalsHeaderRow + 1;
+        foreach (var grandTotalsRow in grandTotalsRows)
+        {
+            ws.Cells[totalsRow, 1].Value = grandTotalsRow.SourceFile;
+            ws.Cells[totalsRow, 2].Value = grandTotalsRow.NetProfitAfterCommissions;
+            ws.Cells[totalsRow, 3].Value = grandTotalsRow.CommissionCost;
+            ws.Cells[totalsRow, 4].Value = grandTotalsRow.GrossProfitBeforeCommissions;
+            totalsRow++;
+        }
+
+        int finalSummaryRow = Math.Max(totalsRow + 2, dataEndRow + 6);
+        ws.Cells[finalSummaryRow, 1].Value = "Final Net Profit After Commissions";
+        ws.Cells[finalSummaryRow + 1, 1].Value = "Final Commission Cost";
+        ws.Cells[finalSummaryRow + 2, 1].Value = "Final Gross Profit Before Commissions";
+        ws.Cells[finalSummaryRow, 2].Formula = $"={ws.Cells[2, 2].Address}";
+        ws.Cells[finalSummaryRow + 1, 2].Formula = $"={ws.Cells[3, 2].Address}";
+        ws.Cells[finalSummaryRow + 2, 2].Formula = $"={ws.Cells[4, 2].Address}";
+        ws.Cells[totalsHeaderRow, 1, totalsHeaderRow, 4].Style.Font.Bold = true;
+        ws.Cells[totalsHeaderRow + 1, 2, Math.Max(totalsHeaderRow + 1, totalsRow - 1), 4].Style.Numberformat.Format = "$#,##0.00;-$#,##0.00";
+        ws.Cells[finalSummaryRow, 1, finalSummaryRow + 2, 2].Style.Font.Bold = true;
+        ws.Cells[finalSummaryRow, 2, finalSummaryRow + 2, 2].Style.Numberformat.Format = "$#,##0.00;-$#,##0.00";
+        ws.Cells.AutoFitColumns();
     }
 
     static void Main(string[] args)
@@ -362,6 +486,10 @@ class Program
             if (name.EndsWith("profitResults", StringComparison.OrdinalIgnoreCase))
             {
                 group = "profitResults";
+            }
+            else if (name.EndsWith("grandTotalsResults", StringComparison.OrdinalIgnoreCase))
+            {
+                group = "grandTotalsResults";
             }
             else if (name.EndsWith("orderTotalsResults", StringComparison.OrdinalIgnoreCase))
             {
@@ -969,7 +1097,11 @@ class Program
             }
 
             groups.TryGetValue("profitResults", out var profitResultFiles);
-            AddGrandTotalWorksheet(package, profitResultFiles ?? new List<string>());
+            groups.TryGetValue("grandTotalsResults", out var grandTotalsResultFiles);
+            AddGrandTotalWorksheet(
+                package,
+                profitResultFiles ?? new List<string>(),
+                grandTotalsResultFiles ?? new List<string>());
 
             package.SaveAs(new FileInfo(outputFile));
         }
