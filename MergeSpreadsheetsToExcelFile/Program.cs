@@ -518,6 +518,13 @@ class Program
             foreach (var group in groups)
             {
                 string sheetName = group.Key;
+                if (sheetName.Equals("profitResults", StringComparison.OrdinalIgnoreCase) ||
+                    sheetName.Equals("grandTotalsResults", StringComparison.OrdinalIgnoreCase) ||
+                    sheetName.Equals("orderTotalsResults", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 Console.WriteLine("Creating Sheet: " + sheetName);
                 // Excel sheet name limit
                 if (sheetName.Length > 31)
@@ -616,6 +623,10 @@ class Program
                 int dataEndRow = row - 1;
 
                 int lastColumn = ws.Dimension.End.Column;
+                if (dataEndRow < dataStartRow || lastColumn < 1)
+                {
+                    continue;
+                }
 
                 
 
