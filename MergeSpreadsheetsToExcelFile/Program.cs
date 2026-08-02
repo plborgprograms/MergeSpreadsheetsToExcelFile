@@ -301,19 +301,24 @@ class Program
 
                 string metric = cells[0];
                 double value = ParseDoubleOrZero(cells[1]);
+                // Order matters: "Gross Profit Before Commissions" contains the substring
+                // "Commission" (inside "Commissions"), so it must be checked before the
+                // "Commission" branch below - otherwise it gets misclassified as the commission
+                // row (clobbering the real "Commission Cost" value with net+commission) and the
+                // dedicated Gross Profit branch never fires, leaving grossProfit stuck at 0.
                 if (metric.Contains("Net Profit", StringComparison.OrdinalIgnoreCase))
                 {
                     netProfit = value;
                     foundAny = true;
                 }
-                else if (metric.Contains("Commission", StringComparison.OrdinalIgnoreCase))
-                {
-                    commissionCost = value;
-                    foundAny = true;
-                }
                 else if (metric.Contains("Gross Profit", StringComparison.OrdinalIgnoreCase))
                 {
                     grossProfit = value;
+                    foundAny = true;
+                }
+                else if (metric.Contains("Commission", StringComparison.OrdinalIgnoreCase))
+                {
+                    commissionCost = value;
                     foundAny = true;
                 }
             }
